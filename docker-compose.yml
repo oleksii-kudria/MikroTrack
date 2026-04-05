@@ -1,0 +1,8 @@
+services:
+  mikrotrack-app:
+    container_name: mikrotrack-app
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    env_file:
+      - .env
