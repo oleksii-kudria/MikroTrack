@@ -4,8 +4,9 @@ import json
 import logging
 import sys
 
-from app.collector import collect_dhcp_leases
+from app.collector import get_arp_entries, get_dhcp_leases
 from app.config import load_config
+from app.device_builder import build_devices
 from app.errors import to_mikrotrack_error
 from app.exceptions import MikroTrackError
 from app.logging_config import setup_logging
@@ -59,11 +60,16 @@ def main() -> None:
             use_ssl=config.mikrotik_use_ssl,
             ssl_verify=config.mikrotik_ssl_verify,
         ) as client:
-            leases = collect_dhcp_leases(client)
-            logger.info("Collected %d DHCP lease records", len(leases))
+            dhcp = get_dhcp_leases(client)
+            arp = get_arp_entries(client)
+            devices = build_devices(dhcp, arp)
+
+            logger.info("Collected %d DHCP lease records", len(dhcp))
+            logger.info("Collected %d ARP records", len(arp))
+            logger.info("Built %d devices", len(devices))
             if config.print_result_to_stdout:
                 logger.debug("Printing JSON result to stdout")
-                sys.stdout.write(f"{json.dumps(leases, ensure_ascii=False, indent=2)}\n")
+                sys.stdout.write(f"{json.dumps(devices, ensure_ascii=False, indent=2)}\n")
             else:
                 logger.info("PRINT_RESULT_TO_STDOUT is disabled, skipping JSON output")
         logger.info("MikroTrack application finished successfully")
