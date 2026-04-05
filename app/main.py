@@ -6,6 +6,7 @@ import sys
 
 from app.collector import collect_dhcp_leases
 from app.config import load_config
+from app.errors import error_summary
 from app.logging_config import setup_logging
 from app.mikrotik_client import MikroTikClient
 
@@ -34,7 +35,12 @@ def main() -> None:
             logger.info("Collected %d DHCP lease records", len(leases))
             print(json.dumps(leases, ensure_ascii=False, indent=2))
     except Exception as error:
-        logger.error("MikroTrack execution failed: %s", error)
+        error_code, message, recommendation = error_summary(error)
+        logger.error("[%s] %s", error_code, message)
+        logger.error("Recommendation: %s", recommendation)
+        print(message, file=sys.stderr)
+        print(f"Recommendation: {recommendation}", file=sys.stderr)
+        logger.exception("Execution failed with raw exception details")
         sys.exit(1)
 
 
