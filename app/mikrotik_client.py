@@ -5,7 +5,7 @@ from typing import Any
 
 import routeros_api
 
-from app.errors import error_summary
+from app.errors import to_mikrotrack_error
 
 
 class MikroTikClient:
@@ -50,12 +50,8 @@ class MikroTikClient:
             self.api = self._connection.get_api()
             self.logger.info("Connected to MikroTik API")
         except Exception as error:
-            error_code, message, recommendation = error_summary(error)
-            self.logger.error("[%s] %s", error_code, message)
-            self.logger.error("Recommendation: %s", recommendation)
-            self.logger.exception("Connection attempt failed with raw exception details")
             self.disconnect()
-            raise
+            raise to_mikrotrack_error(error) from error
 
     def disconnect(self) -> None:
         if self._connection is None:

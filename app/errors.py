@@ -3,7 +3,8 @@ from __future__ import annotations
 import errno
 import socket
 import ssl
-from typing import Any
+
+from app.exceptions import MikroTrackError
 
 
 class DhcpFetchError(RuntimeError):
@@ -127,12 +128,13 @@ def format_error(exception: Exception) -> dict[str, str]:
     }
 
 
-def error_summary(exception: Exception) -> tuple[str, str, str]:
-    """Convenience tuple for logging and CLI output."""
+def to_mikrotrack_error(exception: Exception) -> MikroTrackError:
+    """Wrap exception into MikroTrackError using a known user-friendly payload."""
 
-    payload: dict[str, Any] = format_error(exception)
-    return (
-        str(payload["error_code"]),
-        str(payload["message"]),
-        str(payload["recommendation"]),
+    payload = format_error(exception)
+    return MikroTrackError(
+        error_code=payload["error_code"],
+        message=payload["message"],
+        recommendation=payload["recommendation"],
+        original_exception=exception,
     )
