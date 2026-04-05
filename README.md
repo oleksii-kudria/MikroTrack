@@ -48,7 +48,7 @@ docker compose up --build
 
 ```routeros
 /user group add name=mikrotrack policy=read,api
-/user add name=mikrotrack password=StrongPassword group=mikrotrack
+/user add name=mikrotrack password=<SET_IN_SECRET_STORE> group=mikrotrack
 ```
 
 ### 4. Згенерувати сертифікат для api-ssl (якщо ще немає)
@@ -80,3 +80,54 @@ nc -vz MIKROTIK_IP 8729
 - не використовувати `admin`;
 - обмежити доступ по IP;
 - використовувати тільки `api-ssl` (`8729`).
+
+## Troubleshooting
+
+### Connection refused
+
+Причина:
+- `api-ssl` вимкнено;
+- використовується неправильний порт;
+- доступ блокує firewall.
+
+Рішення:
+- увімкнути `api-ssl`;
+- перевірити порт `8729`;
+- перевірити мережевий доступ і правила firewall.
+
+### SSL handshake failure
+
+Причина:
+- відсутній SSL-сертифікат;
+- сертифікат не призначено для `api-ssl`.
+
+Рішення:
+- створити сертифікат;
+- призначити сертифікат сервісу `api-ssl`.
+
+### Authentication failed
+
+Причина:
+- неправильний логін або пароль.
+
+Рішення:
+- перевірити значення у `.env`;
+- перевірити існування користувача MikroTik та його credentials.
+
+### Not allowed (9)
+
+Причина:
+- у користувача недостатньо прав.
+
+Рішення:
+- перевірити, що для групи встановлено `policy=read,api`.
+
+### Timeout
+
+Причина:
+- відсутній мережевий доступ до MikroTik.
+
+Рішення:
+- перевірити IP-адресу;
+- перевірити правила firewall і маршрутизацію.
+
