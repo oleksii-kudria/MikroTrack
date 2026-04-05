@@ -30,10 +30,12 @@ class MikroTikClient:
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def connect(self) -> None:
-        self.logger.info(
-            "Connecting to MikroTik %s:%s (ssl=%s, ssl_verify=%s)",
+        self.logger.info("Connecting to MikroTik %s:%s", self.host, self.port)
+        self.logger.debug(
+            "Connection settings: host=%s, port=%s, username=%s, use_ssl=%s, ssl_verify=%s",
             self.host,
             self.port,
+            self.username,
             self.use_ssl,
             self.ssl_verify,
         )
@@ -49,6 +51,7 @@ class MikroTikClient:
             )
             self.api = self._connection.get_api()
             self.logger.info("Connected to MikroTik API")
+            self.logger.debug("RouterOS API session initialized")
         except Exception as error:
             self.disconnect()
             raise to_mikrotrack_error(error) from error
@@ -65,10 +68,12 @@ class MikroTikClient:
         finally:
             self._connection = None
             self.api = None
+            self.logger.debug("Client state has been reset after disconnect")
 
     def get_resource(self, path: str) -> Any:
         if self.api is None:
             raise RuntimeError("MikroTik API is not connected")
+        self.logger.debug("Requesting API resource path: %s", path)
         return self.api.get_resource(path)
 
     def __enter__(self) -> "MikroTikClient":

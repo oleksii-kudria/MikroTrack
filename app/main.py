@@ -35,6 +35,20 @@ def main() -> None:
 
     setup_logging(config.log_level)
     logger = logging.getLogger("mikrotrack")
+    logger.info("MikroTrack application started")
+    logger.debug(
+        (
+            "Loaded config: host=%s, port=%s, username=%s, use_ssl=%s, "
+            "ssl_verify=%s, log_level=%s, print_result_to_stdout=%s"
+        ),
+        config.mikrotik_host,
+        config.mikrotik_port,
+        config.mikrotik_username,
+        config.mikrotik_use_ssl,
+        config.mikrotik_ssl_verify,
+        config.log_level,
+        config.print_result_to_stdout,
+    )
 
     try:
         with MikroTikClient(
@@ -47,7 +61,12 @@ def main() -> None:
         ) as client:
             leases = collect_dhcp_leases(client)
             logger.info("Collected %d DHCP lease records", len(leases))
-            sys.stdout.write(f"{json.dumps(leases, ensure_ascii=False, indent=2)}\n")
+            if config.print_result_to_stdout:
+                logger.debug("Printing JSON result to stdout")
+                sys.stdout.write(f"{json.dumps(leases, ensure_ascii=False, indent=2)}\n")
+            else:
+                logger.info("PRINT_RESULT_TO_STDOUT is disabled, skipping JSON output")
+        logger.info("MikroTrack application finished successfully")
     except MikroTrackError as error:
         logger.error("[%s] %s", error.error_code, error.message)
         logger.error("Recommendation: %s", error.recommendation)
