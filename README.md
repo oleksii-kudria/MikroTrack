@@ -1,6 +1,6 @@
 # MikroTrack DHCP Collector
 
-Сервіс підключається до MikroTik через RouterOS API, отримує DHCP leases і виводить результат у форматі JSON.
+Сервіс підключається до MikroTik через RouterOS `api-ssl` (порт `8729`), отримує DHCP leases і виводить результат у форматі JSON.
 
 ## Швидкий старт
 
@@ -21,51 +21,62 @@ docker compose up --build
 ## Змінні середовища
 
 - `MIKROTIK_HOST` — адреса MikroTik.
-- `MIKROTIK_PORT` — порт API (`8728` для `api`, `8729` для `api-ssl`).
+- `MIKROTIK_PORT` — порт API SSL (`8729` за замовчуванням).
 - `MIKROTIK_USERNAME` — користувач MikroTik.
 - `MIKROTIK_PASSWORD` — пароль користувача.
+- `MIKROTIK_USE_SSL` — увімкнути SSL (`true` за замовчуванням).
+- `MIKROTIK_SSL_VERIFY` — перевіряти TLS-сертифікат (`false` за замовчуванням).
 - `LOG_LEVEL` — рівень логування (`INFO` за замовчуванням).
 
 ## Налаштування MikroTik
 
-### 1. Дозволити доступ до API лише з IP сервера
-
-Приклад (замінити IP):
+### 1. Увімкнути api-ssl
 
 ```routeros
-/ip service set api address=192.168.1.100/32
+/ip service enable api-ssl
 ```
 
-або якщо потрібно `api-ssl`:
+### 2. Обмежити доступ до api-ssl лише з IP сервера
+
+Приклад (замінити IP на адресу вашого сервера):
 
 ```routeros
 /ip service set api-ssl address=192.168.1.100/32
 ```
 
-### 2. Створити користувача для MikroTrack
+### 3. Створити групу та користувача для MikroTrack
 
 ```routeros
-/user group add name=mikrotrack policy=read,api,!write,!policy,!test,!password,!sniff,!sensitive,!romon
+/user group add name=mikrotrack policy=read,api
 /user add name=mikrotrack password=StrongPassword group=mikrotrack
 ```
 
-### 3. Перевірити доступ
+### 4. Згенерувати сертифікат для api-ssl (якщо ще немає)
+
+```routeros
+/certificate add name=api-cert common-name=mikrotik
+/certificate sign api-cert
+/ip service set api-ssl certificate=api-cert
+```
+
+Перевірка:
+
+```routeros
+/certificate print
+/ip service print detail where name=api-ssl
+```
+
+### 5. Перевірити доступ
 
 З сервера:
 
 ```bash
-telnet MIKROTIK_IP 8728
+nc -vz MIKROTIK_IP 8729
 ```
 
-або
-
-```bash
-nc -vz MIKROTIK_IP 8728
-```
-
-### 4. Рекомендації безпеки
+### 6. Рекомендації безпеки
 
 - використовувати окремого користувача;
 - не використовувати `admin`;
 - обмежити доступ по IP;
-- по можливості використовувати `api-ssl` (`8729`).
+- використовувати тільки `api-ssl` (`8729`).

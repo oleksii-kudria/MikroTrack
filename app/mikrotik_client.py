@@ -12,21 +12,29 @@ class MikroTikClient:
         host: str,
         username: str,
         password: str,
-        port: int = 8728,
-        use_ssl: bool = False,
+        port: int = 8729,
+        use_ssl: bool = True,
+        ssl_verify: bool = False,
     ) -> None:
         self.host = host
         self.username = username
         self.password = password
         self.port = port
         self.use_ssl = use_ssl
+        self.ssl_verify = ssl_verify
 
         self._connection: routeros_api.RouterOsApiPool | None = None
         self.api: Any = None
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def connect(self) -> None:
-        self.logger.info("Connecting to MikroTik %s:%s", self.host, self.port)
+        self.logger.info(
+            "Connecting to MikroTik %s:%s (ssl=%s, ssl_verify=%s)",
+            self.host,
+            self.port,
+            self.use_ssl,
+            self.ssl_verify,
+        )
         try:
             self._connection = routeros_api.RouterOsApiPool(
                 host=self.host,
@@ -34,6 +42,7 @@ class MikroTikClient:
                 password=self.password,
                 port=self.port,
                 use_ssl=self.use_ssl,
+                ssl_verify=self.ssl_verify,
                 plaintext_login=True,
             )
             self.api = self._connection.get_api()
