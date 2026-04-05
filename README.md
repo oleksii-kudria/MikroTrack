@@ -28,6 +28,39 @@ docker compose up --build
 - `MIKROTIK_SSL_VERIFY` — перевіряти TLS-сертифікат (`false` за замовчуванням).
 - `LOG_LEVEL` — рівень логування (`INFO` за замовчуванням).
 - `PRINT_RESULT_TO_STDOUT` — керування виводом JSON у stdout (`true` за замовчуванням).
+- `RUN_MODE` — режим запуску (`once` або `loop`, за замовчуванням `once`).
+- `COLLECTION_INTERVAL` — інтервал циклічного збору в секундах (за замовчуванням `60`).
+
+## Scheduler / Continuous Collection
+
+MikroTrack can run either as a one-time execution or as a continuous monitoring service.
+
+### Configuration
+
+```dotenv
+RUN_MODE=loop
+COLLECTION_INTERVAL=60
+```
+
+### Parameters
+
+- `RUN_MODE`:
+  - `once` - run once and exit
+  - `loop` - continuous execution
+- `COLLECTION_INTERVAL`:
+  - interval in seconds
+  - recommended: 60
+
+### Behavior
+
+- In loop mode, MikroTrack continuously collects DHCP + ARP data.
+- Service does not stop on errors.
+- Errors are logged and next iteration continues.
+
+### Notes
+
+- ARP data is short-lived.
+- Recommended interval: 60 seconds.
 
 ## Налаштування MikroTik
 

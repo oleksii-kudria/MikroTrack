@@ -12,6 +12,8 @@ class Config:
     mikrotik_ssl_verify: bool
     log_level: str = "INFO"
     print_result_to_stdout: bool = True
+    run_mode: str = "once"
+    collection_interval: int = 60
 
 
 def _parse_bool(value: str, *, variable_name: str) -> bool:
@@ -21,6 +23,25 @@ def _parse_bool(value: str, *, variable_name: str) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"{variable_name} must be a boolean value")
+
+
+def _parse_run_mode(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in {"once", "loop"}:
+        raise ValueError("RUN_MODE must be either 'once' or 'loop'")
+    return normalized
+
+
+def _parse_positive_int(value: str, *, variable_name: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise ValueError(f"{variable_name} must be an integer") from error
+
+    if parsed <= 0:
+        raise ValueError(f"{variable_name} must be greater than zero")
+
+    return parsed
 
 
 
@@ -53,5 +74,10 @@ def load_config() -> Config:
         print_result_to_stdout=_parse_bool(
             os.getenv("PRINT_RESULT_TO_STDOUT", "true"),
             variable_name="PRINT_RESULT_TO_STDOUT",
+        ),
+        run_mode=_parse_run_mode(os.getenv("RUN_MODE", "once")),
+        collection_interval=_parse_positive_int(
+            os.getenv("COLLECTION_INTERVAL", "60"),
+            variable_name="COLLECTION_INTERVAL",
         ),
     )
