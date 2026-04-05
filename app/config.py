@@ -14,6 +14,9 @@ class Config:
     print_result_to_stdout: bool = True
     run_mode: str = "once"
     collection_interval: int = 60
+    persistence_enabled: bool = True
+    persistence_path: str = "/data/snapshots"
+    persistence_retention_days: int = 7
 
 
 def str_to_bool(value: str) -> bool:
@@ -35,6 +38,18 @@ def _parse_positive_int(value: str, *, variable_name: str) -> int:
 
     if parsed <= 0:
         raise ValueError(f"{variable_name} must be greater than zero")
+
+    return parsed
+
+
+def _parse_non_negative_int(value: str, *, variable_name: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise ValueError(f"{variable_name} must be an integer") from error
+
+    if parsed < 0:
+        raise ValueError(f"{variable_name} must be zero or greater")
 
     return parsed
 
@@ -66,5 +81,12 @@ def load_config() -> Config:
         collection_interval=_parse_positive_int(
             os.getenv("COLLECTION_INTERVAL", "60"),
             variable_name="COLLECTION_INTERVAL",
+        ),
+        persistence_enabled=str_to_bool(os.getenv("PERSISTENCE_ENABLED", "true")),
+        persistence_path=os.getenv("PERSISTENCE_PATH", "/data/snapshots").strip()
+        or "/data/snapshots",
+        persistence_retention_days=_parse_non_negative_int(
+            os.getenv("PERSISTENCE_RETENTION_DAYS", "7"),
+            variable_name="PERSISTENCE_RETENTION_DAYS",
         ),
     )

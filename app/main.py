@@ -14,6 +14,7 @@ from app.errors import to_mikrotrack_error
 from app.exceptions import MikroTrackError
 from app.logging_config import setup_logging
 from app.mikrotik_client import MikroTikClient
+from app.persistence import configure_persistence, save_snapshot
 from app.sanitizer import sanitize
 
 RETRY_BACKOFF_SECONDS = 10
@@ -87,7 +88,8 @@ def main() -> None:
         (
             "Loaded config: host=%s, port=%s, username=%s, use_ssl=%s, "
             "ssl_verify=%s, log_level=%s, print_result_to_stdout=%s, "
-            "run_mode=%s, collection_interval=%ss"
+            "run_mode=%s, collection_interval=%ss, persistence_enabled=%s, "
+            "persistence_path=%s, persistence_retention_days=%s"
         ),
         config.mikrotik_host,
         config.mikrotik_port,
@@ -98,12 +100,24 @@ def main() -> None:
         config.print_result_to_stdout,
         config.run_mode,
         config.collection_interval,
+        config.persistence_enabled,
+        config.persistence_path,
+        config.persistence_retention_days,
     )
+
+    if config.persistence_enabled:
+        configure_persistence(
+            config.persistence_path,
+            config.persistence_retention_days,
+        )
 
     if config.run_mode == "once":
         logger.info("Starting in ONCE mode")
         try:
             result = _run_once(config, logger)
+            if config.persistence_enabled:
+                save_snapshot(result)
+
             if config.print_result_to_stdout:
                 logger.info("Result printed to stdout (optional)")
                 logger.debug("Output size: %d devices", len(result))
@@ -130,6 +144,9 @@ def main() -> None:
     while not should_stop[0]:
         try:
             result = _run_once(config, logger)
+            if config.persistence_enabled:
+                save_snapshot(result)
+
             if config.print_result_to_stdout:
                 logger.info("Result printed to stdout (optional)")
                 logger.debug("Output size: %d devices", len(result))
