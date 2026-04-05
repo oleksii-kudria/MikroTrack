@@ -17,8 +17,25 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
 
         devices_by_mac[mac_address] = {
             "mac_address": mac_address,
-            "ip_address": lease.get("address", ""),
+            "ip_address": lease.get("ip_address", ""),
             "host_name": lease.get("host_name", ""),
+            "dhcp_comment": lease.get("comment", ""),
+            "arp_comment": "",
+            "dhcp_status": lease.get("status", "unknown"),
+            "arp_status": "unknown",
+            "dhcp_flags": {
+                "dynamic": lease.get("dynamic", False),
+            },
+            "arp_flags": {
+                "dynamic": False,
+                "dhcp": False,
+                "complete": False,
+                "disabled": False,
+                "invalid": False,
+                "published": False,
+            },
+            "created_by": "dhcp",
+            "arp_type": "unknown",
             "source": ["dhcp"],
         }
         logger.debug("merge steps: added DHCP device for MAC=%s", mac_address)
@@ -37,6 +54,23 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
                 "mac_address": mac_address,
                 "ip_address": arp_ip,
                 "host_name": "",
+                "dhcp_comment": "",
+                "arp_comment": entry.get("comment", ""),
+                "dhcp_status": "unknown",
+                "arp_status": entry.get("status", "unknown"),
+                "dhcp_flags": {
+                    "dynamic": False,
+                },
+                "arp_flags": {
+                    "dynamic": entry.get("dynamic", False),
+                    "dhcp": entry.get("dhcp", False),
+                    "complete": entry.get("complete", False),
+                    "disabled": entry.get("disabled", False),
+                    "invalid": entry.get("invalid", False),
+                    "published": entry.get("published", False),
+                },
+                "created_by": "manual",
+                "arp_type": "dynamic" if entry.get("dynamic", False) else "static",
                 "source": ["arp"],
             }
             logger.debug("merge steps: added ARP-only device for MAC=%s", mac_address)
@@ -56,6 +90,25 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
         else:
             logger.debug("merge steps: MAC=%s merged with ARP", mac_address)
 
+        existing["arp_comment"] = entry.get("comment", "")
+        existing["arp_status"] = entry.get("status", "unknown")
+        existing["arp_flags"] = {
+            "dynamic": entry.get("dynamic", False),
+            "dhcp": entry.get("dhcp", False),
+            "complete": entry.get("complete", False),
+            "disabled": entry.get("disabled", False),
+            "invalid": entry.get("invalid", False),
+            "published": entry.get("published", False),
+        }
+        existing["arp_type"] = "dynamic" if entry.get("dynamic", False) else "static"
+        if existing["created_by"] != "dhcp":
+            existing["created_by"] = "manual"
+        logger.debug(
+            "merge steps: MAC=%s updated comments/status/flags from ARP",
+            mac_address,
+        )
+
     devices = list(devices_by_mac.values())
+    logger.debug("Device sample after merge: %s", devices[0] if devices else {})
     logger.info("Devices built: %d", len(devices))
     return devices
