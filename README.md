@@ -14,7 +14,7 @@ MikroTrack — це lightweight collector для моніторингу мере
 ### Архітектура (коротко)
 
 - лише collector
-- без persistence (поки що)
+- persistence через JSON snapshots
 - без API
 - без UI
 
@@ -33,12 +33,33 @@ docker compose up --build
 - `RUN_MODE`
 - `COLLECTION_INTERVAL`
 - `PRINT_RESULT_TO_STDOUT`
+- `PERSISTENCE_ENABLED`
+- `PERSISTENCE_PATH`
+- `PERSISTENCE_RETENTION_DAYS`
+
+### Persistence
+
+Snapshot-файли зберігаються у директорії `PERSISTENCE_PATH`.
+
+- Формат імені: `YYYY-MM-DDTHH-MM-SS.json`
+- Збереження вмикається через `PERSISTENCE_ENABLED=true`
+- Автоматично створюється директорія, якщо її ще немає
+- Старі файли видаляються за політикою `PERSISTENCE_RETENTION_DAYS`
+
+Приклад:
+
+```env
+PERSISTENCE_ENABLED=true
+PERSISTENCE_PATH=/data/snapshots
+PERSISTENCE_RETENTION_DAYS=7
+```
 
 ### Документація
 
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
 - Device model → [`docs/device-model.md`](docs/device-model.md)
 - Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
+- Storage → [`docs/storage.md`](docs/storage.md)
 - Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
 
@@ -58,7 +79,7 @@ Builds:
 ### Architecture (short)
 
 - collector only
-- no persistence (yet)
+- JSON snapshot persistence
 - no API
 - no UI
 
@@ -77,11 +98,32 @@ docker compose up --build
 - `RUN_MODE`
 - `COLLECTION_INTERVAL`
 - `PRINT_RESULT_TO_STDOUT`
+- `PERSISTENCE_ENABLED`
+- `PERSISTENCE_PATH`
+- `PERSISTENCE_RETENTION_DAYS`
+
+### Persistence
+
+Snapshot files are stored in `PERSISTENCE_PATH`.
+
+- File name format: `YYYY-MM-DDTHH-MM-SS.json`
+- Enable via `PERSISTENCE_ENABLED=true`
+- Directory is created automatically if missing
+- Old files are removed using `PERSISTENCE_RETENTION_DAYS`
+
+Example:
+
+```env
+PERSISTENCE_ENABLED=true
+PERSISTENCE_PATH=/data/snapshots
+PERSISTENCE_RETENTION_DAYS=7
+```
 
 ### Documentation
 
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
 - Device model → [`docs/device-model.md`](docs/device-model.md)
 - Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
+- Storage → [`docs/storage.md`](docs/storage.md)
 - Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
