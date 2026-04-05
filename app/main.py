@@ -10,6 +10,7 @@ from app.errors import to_mikrotrack_error
 from app.exceptions import MikroTrackError
 from app.logging_config import setup_logging
 from app.mikrotik_client import MikroTikClient
+from app.sanitizer import sanitize
 
 
 def _debug_log_exception(logger: logging.Logger, error: MikroTrackError) -> None:
@@ -17,14 +18,7 @@ def _debug_log_exception(logger: logging.Logger, error: MikroTrackError) -> None
         return
 
     original_exception = error.original_exception
-    logger.debug(
-        "Raw exception details",
-        exc_info=(
-            type(original_exception),
-            original_exception,
-            original_exception.__traceback__,
-        ),
-    )
+    logger.debug("Raw exception: %s", sanitize(str(original_exception)))
 
 
 def main() -> None:
@@ -53,7 +47,7 @@ def main() -> None:
         ) as client:
             leases = collect_dhcp_leases(client)
             logger.info("Collected %d DHCP lease records", len(leases))
-            print(json.dumps(leases, ensure_ascii=False, indent=2))
+            sys.stdout.write(f"{json.dumps(leases, ensure_ascii=False, indent=2)}\n")
     except MikroTrackError as error:
         logger.error("[%s] %s", error.error_code, error.message)
         logger.error("Recommendation: %s", error.recommendation)
