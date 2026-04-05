@@ -16,13 +16,8 @@ class Config:
     collection_interval: int = 60
 
 
-def _parse_bool(value: str, *, variable_name: str) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    raise ValueError(f"{variable_name} must be a boolean value")
+def str_to_bool(value: str) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _parse_run_mode(value: str) -> str:
@@ -44,7 +39,6 @@ def _parse_positive_int(value: str, *, variable_name: str) -> int:
     return parsed
 
 
-
 def load_config() -> Config:
     host = os.getenv("MIKROTIK_HOST", "").strip()
     username = os.getenv("MIKROTIK_USERNAME", "").strip()
@@ -62,18 +56,11 @@ def load_config() -> Config:
         mikrotik_port=int(os.getenv("MIKROTIK_PORT", "8729")),
         mikrotik_username=username,
         mikrotik_password=password,
-        mikrotik_use_ssl=_parse_bool(
-            os.getenv("MIKROTIK_USE_SSL", "true"),
-            variable_name="MIKROTIK_USE_SSL",
-        ),
-        mikrotik_ssl_verify=_parse_bool(
-            os.getenv("MIKROTIK_SSL_VERIFY", "false"),
-            variable_name="MIKROTIK_SSL_VERIFY",
-        ),
+        mikrotik_use_ssl=str_to_bool(os.getenv("MIKROTIK_USE_SSL", "true")),
+        mikrotik_ssl_verify=str_to_bool(os.getenv("MIKROTIK_SSL_VERIFY", "false")),
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        print_result_to_stdout=_parse_bool(
-            os.getenv("PRINT_RESULT_TO_STDOUT", "true"),
-            variable_name="PRINT_RESULT_TO_STDOUT",
+        print_result_to_stdout=str_to_bool(
+            os.getenv("PRINT_RESULT_TO_STDOUT", "true")
         ),
         run_mode=_parse_run_mode(os.getenv("RUN_MODE", "once")),
         collection_interval=_parse_positive_int(

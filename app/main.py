@@ -27,7 +27,7 @@ def _debug_log_exception(logger: logging.Logger, error: MikroTrackError) -> None
     logger.debug("Raw exception: %s", sanitize(str(original_exception)))
 
 
-def _run_once(config: Config, logger: logging.Logger) -> None:
+def _run_once(config: Config, logger: logging.Logger) -> list[dict[str, object]]:
     logger.info("Starting collection cycle")
     cycle_started_at = time.monotonic()
     logger.debug("Collecting DHCP leases")
@@ -48,15 +48,11 @@ def _run_once(config: Config, logger: logging.Logger) -> None:
     logger.info("Collected %d DHCP lease records", len(dhcp))
     logger.info("Collected %d ARP records", len(arp))
     logger.info("Built %d devices", len(devices))
-    if config.print_result_to_stdout:
-        logger.debug("Printing JSON result to stdout")
-        sys.stdout.write(f"{json.dumps(devices, ensure_ascii=False, indent=2)}\n")
-    else:
-        logger.info("PRINT_RESULT_TO_STDOUT is disabled, skipping JSON output")
 
     elapsed = time.monotonic() - cycle_started_at
     logger.info("Collection finished")
     logger.debug("Collection cycle duration: %.2fs", elapsed)
+    return devices
 
 
 def _register_signal_handlers(logger: logging.Logger) -> list[bool]:
@@ -107,7 +103,14 @@ def main() -> None:
     if config.run_mode == "once":
         logger.info("Starting in ONCE mode")
         try:
-            _run_once(config, logger)
+            result = _run_once(config, logger)
+            if config.print_result_to_stdout:
+                logger.info("Result printed to stdout (optional)")
+                logger.debug("Output size: %d devices", len(result))
+                logger.debug("Sample device: %s", result[0] if result else {})
+                print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
+            else:
+                logger.info("PRINT_RESULT_TO_STDOUT is disabled, skipping JSON output")
             logger.info("MikroTrack application finished successfully")
             return
         except MikroTrackError as error:
@@ -126,7 +129,14 @@ def main() -> None:
     should_stop = _register_signal_handlers(logger)
     while not should_stop[0]:
         try:
-            _run_once(config, logger)
+            result = _run_once(config, logger)
+            if config.print_result_to_stdout:
+                logger.info("Result printed to stdout (optional)")
+                logger.debug("Output size: %d devices", len(result))
+                logger.debug("Sample device: %s", result[0] if result else {})
+                print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
+            else:
+                logger.info("PRINT_RESULT_TO_STDOUT is disabled, skipping JSON output")
             sleep_for = config.collection_interval
         except Exception as error:
             wrapped_error = to_mikrotrack_error(error)
