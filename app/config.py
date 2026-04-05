@@ -11,6 +11,7 @@ class Config:
     mikrotik_use_ssl: bool
     mikrotik_ssl_verify: bool
     log_level: str = "INFO"
+    print_result_to_stdout: bool = True
 
 
 def _parse_bool(value: str, *, variable_name: str) -> bool:
@@ -49,4 +50,8 @@ def load_config() -> Config:
             variable_name="MIKROTIK_SSL_VERIFY",
         ),
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        print_result_to_stdout=_parse_bool(
+            os.getenv("PRINT_RESULT_TO_STDOUT", "true"),
+            variable_name="PRINT_RESULT_TO_STDOUT",
+        ),
     )

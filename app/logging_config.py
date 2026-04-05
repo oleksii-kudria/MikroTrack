@@ -6,4 +6,5 @@ def setup_logging(level: str = "INFO") -> None:
     logging.basicConfig(
         level=numeric_level,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
     )

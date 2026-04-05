@@ -27,6 +27,7 @@ docker compose up --build
 - `MIKROTIK_USE_SSL` — увімкнути SSL (`true` за замовчуванням).
 - `MIKROTIK_SSL_VERIFY` — перевіряти TLS-сертифікат (`false` за замовчуванням).
 - `LOG_LEVEL` — рівень логування (`INFO` за замовчуванням).
+- `PRINT_RESULT_TO_STDOUT` — керування виводом JSON у stdout (`true` за замовчуванням).
 
 ## Налаштування MikroTik
 
@@ -130,4 +131,3 @@ nc -vz MIKROTIK_IP 8729
 Рішення:
 - перевірити IP-адресу;
 - перевірити правила firewall і маршрутизацію.
-
