@@ -5,6 +5,8 @@ from typing import Any
 
 import routeros_api
 
+from app.errors import error_summary
+
 
 class MikroTikClient:
     def __init__(
@@ -47,8 +49,11 @@ class MikroTikClient:
             )
             self.api = self._connection.get_api()
             self.logger.info("Connected to MikroTik API")
-        except Exception:
-            self.logger.exception("Failed to connect to MikroTik API")
+        except Exception as error:
+            error_code, message, recommendation = error_summary(error)
+            self.logger.error("[%s] %s", error_code, message)
+            self.logger.error("Recommendation: %s", recommendation)
+            self.logger.exception("Connection attempt failed with raw exception details")
             self.disconnect()
             raise
 
