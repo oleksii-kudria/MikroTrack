@@ -6,3 +6,5 @@ services:
       dockerfile: docker/app/Dockerfile
     env_file:
       - .env
+    volumes:
+      - /data/snapshots:/data/snapshots
