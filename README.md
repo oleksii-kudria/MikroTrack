@@ -1,24 +1,25 @@
-# MikroTrack DHCP Collector
+# MikroTrack
 
-Сервіс підключається до MikroTik через RouterOS `api-ssl` (порт `8729`), отримує DHCP leases і виводить результат у форматі JSON.
+## 🇺🇦 Українською
 
-## Швидкий старт
+MikroTrack підключається до MikroTik через RouterOS `api-ssl` (порт `8729`), збирає DHCP leases та ARP записи, збагачує модель пристрою і повертає JSON.
 
-1. Створіть `.env` файл на основі прикладу:
+### Швидкий старт
+
+1. Створіть `.env` файл:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Заповніть параметри доступу до MikroTik у `.env`.
-
-3. Запустіть застосунок:
+2. Заповніть параметри доступу до MikroTik.
+3. Запустіть сервіс:
 
 ```bash
 docker compose up --build
 ```
 
-## Змінні середовища
+### Змінні середовища
 
 - `MIKROTIK_HOST` — адреса MikroTik.
 - `MIKROTIK_PORT` — порт API SSL (`8729` за замовчуванням).
@@ -27,140 +28,122 @@ docker compose up --build
 - `MIKROTIK_USE_SSL` — увімкнути SSL (`true` за замовчуванням).
 - `MIKROTIK_SSL_VERIFY` — перевіряти TLS-сертифікат (`false` за замовчуванням).
 - `LOG_LEVEL` — рівень логування (`INFO` за замовчуванням).
-- `PRINT_RESULT_TO_STDOUT` — керування виводом JSON у stdout (`true` за замовчуванням).
-- `RUN_MODE` — режим запуску (`once` або `loop`, за замовчуванням `once`).
-- `COLLECTION_INTERVAL` — інтервал циклічного збору в секундах (за замовчуванням `60`).
+- `PRINT_RESULT_TO_STDOUT` — друк JSON у stdout (`true` за замовчуванням).
+- `RUN_MODE` — режим (`once` або `loop`, за замовчуванням `once`).
+- `COLLECTION_INTERVAL` — інтервал циклічного збору в секундах (`60` за замовчуванням).
 
-## Scheduler / Continuous Collection
+### Device Model
 
-MikroTrack can run either as a one-time execution or as a continuous monitoring service.
+MikroTrack будує єдину модель пристрою з DHCP + ARP:
 
-### Configuration
+- базові поля: `mac_address`, `ip_address`, `host_name`, `source`
+- коментарі: `dhcp_comment`, `arp_comment`
+- стани: `dhcp_status`, `arp_status`
+- прапори: `dhcp_flags`, `arp_flags`
+- похідні поля: `arp_type`, `created_by`
 
-```dotenv
-RUN_MODE=loop
-COLLECTION_INTERVAL=60
-```
+#### DHCP status
 
-### Parameters
+- `waiting` — очікує на підтвердження/видачу
+- `offered` — адресу запропоновано клієнту
+- `bound` — адресу видано та активна прив’язка
 
-- `RUN_MODE`:
-  - `once` - run once and exit
-  - `loop` - continuous execution
-- `COLLECTION_INTERVAL`:
-  - interval in seconds
-  - recommended: 60
+#### DHCP dynamic
 
-### Behavior
+- `true` — динамічний lease, створений DHCP сервером
+- `false` — статичний lease
 
-- In loop mode, MikroTrack continuously collects DHCP + ARP data.
-- Service does not stop on errors.
-- Errors are logged and next iteration continues.
+#### ARP status
 
-### Notes
+- `reachable` — хост доступний
+- `stale` — запис застаріває
+- `failed` — не вдалося підтвердити доступність
+- `incomplete` — неповний ARP запис
 
-- ARP data is short-lived.
-- Recommended interval: 60 seconds.
+#### ARP flags
 
-## Налаштування MikroTik
+- `dynamic` — динамічний ARP запис
+- `dhcp` — запис походить з DHCP
+- `complete` — ARP запис повний
+- `published` — published/proxy ARP
+- `invalid` — недійсний запис
+- `disabled` — запис вимкнений
 
-### 1. Увімкнути api-ssl
+### Scheduler / Continuous Collection
 
-```routeros
-/ip service enable api-ssl
-```
+У режимі `loop` MikroTrack працює безперервно, не зупиняється на помилках і продовжує наступну ітерацію після логування помилки.
 
-### 2. Обмежити доступ до api-ssl лише з IP сервера
+---
 
-Приклад (замінити IP на адресу вашого сервера):
+## 🇬🇧 English
 
-```routeros
-/ip service set api-ssl address=192.168.1.100/32
-```
+MikroTrack connects to MikroTik using RouterOS `api-ssl` (port `8729`), collects DHCP leases and ARP entries, enriches the device model, and returns JSON output.
 
-### 3. Створити групу та користувача для MikroTrack
+### Quick start
 
-```routeros
-/user group add name=mikrotrack policy=read,api
-/user add name=mikrotrack password=<SET_IN_SECRET_STORE> group=mikrotrack
-```
-
-### 4. Згенерувати сертифікат для api-ssl (якщо ще немає)
-
-```routeros
-/certificate add name=api-cert common-name=mikrotik
-/certificate sign api-cert
-/ip service set api-ssl certificate=api-cert
-```
-
-Перевірка:
-
-```routeros
-/certificate print
-/ip service print detail where name=api-ssl
-```
-
-### 5. Перевірити доступ
-
-З сервера:
+1. Create `.env`:
 
 ```bash
-nc -vz MIKROTIK_IP 8729
+cp .env.example .env
 ```
 
-### 6. Рекомендації безпеки
+2. Fill in MikroTik access settings.
+3. Run the service:
 
-- використовувати окремого користувача;
-- не використовувати `admin`;
-- обмежити доступ по IP;
-- використовувати тільки `api-ssl` (`8729`).
+```bash
+docker compose up --build
+```
 
-## Troubleshooting
+### Environment variables
 
-### Connection refused
+- `MIKROTIK_HOST` — MikroTik address.
+- `MIKROTIK_PORT` — API SSL port (`8729` by default).
+- `MIKROTIK_USERNAME` — MikroTik username.
+- `MIKROTIK_PASSWORD` — MikroTik password.
+- `MIKROTIK_USE_SSL` — enable SSL (`true` by default).
+- `MIKROTIK_SSL_VERIFY` — verify TLS certificate (`false` by default).
+- `LOG_LEVEL` — logging level (`INFO` by default).
+- `PRINT_RESULT_TO_STDOUT` — print JSON to stdout (`true` by default).
+- `RUN_MODE` — mode (`once` or `loop`, default `once`).
+- `COLLECTION_INTERVAL` — loop interval in seconds (`60` by default).
 
-Причина:
-- `api-ssl` вимкнено;
-- використовується неправильний порт;
-- доступ блокує firewall.
+### Device Model
 
-Рішення:
-- увімкнути `api-ssl`;
-- перевірити порт `8729`;
-- перевірити мережевий доступ і правила firewall.
+MikroTrack builds a single enriched device model from DHCP + ARP:
 
-### SSL handshake failure
+- base fields: `mac_address`, `ip_address`, `host_name`, `source`
+- comments: `dhcp_comment`, `arp_comment`
+- statuses: `dhcp_status`, `arp_status`
+- flags: `dhcp_flags`, `arp_flags`
+- derived fields: `arp_type`, `created_by`
 
-Причина:
-- відсутній SSL-сертифікат;
-- сертифікат не призначено для `api-ssl`.
+#### DHCP status
 
-Рішення:
-- створити сертифікат;
-- призначити сертифікат сервісу `api-ssl`.
+- `waiting` — waiting for confirmation/assignment
+- `offered` — address offered to a client
+- `bound` — address is assigned and active
 
-### Authentication failed
+#### DHCP dynamic
 
-Причина:
-- неправильний логін або пароль.
+- `true` — dynamic lease created by DHCP server
+- `false` — static lease
 
-Рішення:
-- перевірити значення у `.env`;
-- перевірити існування користувача MikroTik та його credentials.
+#### ARP status
 
-### Not allowed (9)
+- `reachable` — host is reachable
+- `stale` — entry is aging
+- `failed` — reachability confirmation failed
+- `incomplete` — incomplete ARP entry
 
-Причина:
-- у користувача недостатньо прав.
+#### ARP flags
 
-Рішення:
-- перевірити, що для групи встановлено `policy=read,api`.
+- `dynamic` — dynamic ARP entry
+- `dhcp` — entry comes from DHCP
+- `complete` — ARP entry is complete
+- `published` — published/proxy ARP entry
+- `invalid` — invalid entry
+- `disabled` — entry is disabled
 
-### Timeout
+### Scheduler / Continuous Collection
 
-Причина:
-- відсутній мережевий доступ до MikroTik.
-
-Рішення:
-- перевірити IP-адресу;
-- перевірити правила firewall і маршрутизацію.
+In `loop` mode, MikroTrack continuously collects data, logs errors, and keeps running on the next iteration.

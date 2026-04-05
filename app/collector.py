@@ -35,16 +35,19 @@ def get_dhcp_leases(client: MikroTikClient) -> list[dict[str, Any]]:
         logger.debug("Normalizing lease #%d", index + 1)
         result.append(
             {
-                "address": lease.get("address", ""),
+                "ip_address": lease.get("address", ""),
                 "mac_address": lease.get("mac-address", ""),
                 "host_name": lease.get("host-name", ""),
+                "comment": lease.get("comment", ""),
                 "status": lease.get("status", "unknown"),
-                "server": lease.get("server", ""),
+                "dynamic": lease.get("dynamic", "false") == "true",
+                "expires_after": lease.get("expires-after", ""),
+                "last_seen": lease.get("last-seen", ""),
             }
         )
 
-    logger.info("DHCP lease normalization complete: %d records", len(result))
-    logger.debug("Normalized leases sample (up to 2): %s", result[:2])
+    logger.info("DHCP enriched records count: %d", len(result))
+    logger.debug("DHCP enriched record sample (up to 2): %s", result[:2])
 
     return result
 
@@ -72,17 +75,27 @@ def get_arp_entries(client: MikroTikClient) -> list[dict[str, Any]]:
     logger.debug("raw ARP count: %d", len(arp_entries))
 
     normalized: list[dict[str, Any]] = []
-    for entry in arp_entries:
+    for index, entry in enumerate(arp_entries):
         if not isinstance(entry, dict):
             raise UnexpectedMikroTikResponseError("ARP item is not a dictionary")
 
+        logger.debug("Normalizing ARP entry #%d", index + 1)
         normalized.append(
             {
                 "mac_address": entry.get("mac-address", ""),
                 "ip_address": entry.get("address", ""),
                 "interface": entry.get("interface", ""),
+                "comment": entry.get("comment", ""),
+                "status": entry.get("status", "unknown"),
+                "dynamic": entry.get("dynamic", "false") == "true",
+                "dhcp": entry.get("dhcp", "false") == "true",
+                "complete": entry.get("complete", "false") == "true",
+                "disabled": entry.get("disabled", "false") == "true",
+                "invalid": entry.get("invalid", "false") == "true",
+                "published": entry.get("published", "false") == "true",
             }
         )
 
-    logger.debug("sample ARP entry: %s", normalized[0] if normalized else {})
+    logger.info("ARP enriched records count: %d", len(normalized))
+    logger.debug("ARP enriched record sample: %s", normalized[0] if normalized else {})
     return normalized
