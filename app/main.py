@@ -6,9 +6,25 @@ import sys
 
 from app.collector import collect_dhcp_leases
 from app.config import load_config
-from app.errors import error_summary
+from app.errors import to_mikrotrack_error
+from app.exceptions import MikroTrackError
 from app.logging_config import setup_logging
 from app.mikrotik_client import MikroTikClient
+
+
+def _debug_log_exception(logger: logging.Logger, error: MikroTrackError) -> None:
+    if error.original_exception is None:
+        return
+
+    original_exception = error.original_exception
+    logger.debug(
+        "Raw exception details",
+        exc_info=(
+            type(original_exception),
+            original_exception,
+            original_exception.__traceback__,
+        ),
+    )
 
 
 def main() -> None:
@@ -16,7 +32,11 @@ def main() -> None:
         config = load_config()
     except Exception as error:
         setup_logging("INFO")
-        logging.getLogger("mikrotrack").error("Configuration error: %s", error)
+        logger = logging.getLogger("mikrotrack")
+        wrapped_error = to_mikrotrack_error(error)
+        logger.error("[%s] %s", wrapped_error.error_code, wrapped_error.message)
+        logger.error("Recommendation: %s", wrapped_error.recommendation)
+        _debug_log_exception(logger, wrapped_error)
         sys.exit(1)
 
     setup_logging(config.log_level)
@@ -34,13 +54,16 @@ def main() -> None:
             leases = collect_dhcp_leases(client)
             logger.info("Collected %d DHCP lease records", len(leases))
             print(json.dumps(leases, ensure_ascii=False, indent=2))
+    except MikroTrackError as error:
+        logger.error("[%s] %s", error.error_code, error.message)
+        logger.error("Recommendation: %s", error.recommendation)
+        _debug_log_exception(logger, error)
+        sys.exit(1)
     except Exception as error:
-        error_code, message, recommendation = error_summary(error)
-        logger.error("[%s] %s", error_code, message)
-        logger.error("Recommendation: %s", recommendation)
-        print(message, file=sys.stderr)
-        print(f"Recommendation: {recommendation}", file=sys.stderr)
-        logger.exception("Execution failed with raw exception details")
+        wrapped_error = to_mikrotrack_error(error)
+        logger.error("[%s] %s", wrapped_error.error_code, wrapped_error.message)
+        logger.error("Recommendation: %s", wrapped_error.recommendation)
+        _debug_log_exception(logger, wrapped_error)
         sys.exit(1)
 
 
