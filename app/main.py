@@ -27,6 +27,8 @@ def main() -> None:
             port=config.mikrotik_port,
             username=config.mikrotik_username,
             password=config.mikrotik_password,
+            use_ssl=config.mikrotik_use_ssl,
+            ssl_verify=config.mikrotik_ssl_verify,
         ) as client:
             leases = collect_dhcp_leases(client)
             logger.info("Collected %d DHCP lease records", len(leases))
