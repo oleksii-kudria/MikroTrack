@@ -45,7 +45,7 @@ docker compose up --build
 ### 2. Створити користувача для MikroTrack
 
 ```routeros
-/user group add name=mikrotrack policy=read,!write,!policy,!test,!password,!sniff,!sensitive,!romon
+/user group add name=mikrotrack policy=read,api,!write,!policy,!test,!password,!sniff,!sensitive,!romon
 /user add name=mikrotrack password=StrongPassword group=mikrotrack
 ```
 
