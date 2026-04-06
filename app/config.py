@@ -17,6 +17,12 @@ class Config:
     persistence_enabled: bool = True
     persistence_path: str = "/data/snapshots"
     persistence_retention_days: int = 7
+    api_enabled: bool = True
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    web_host: str = "0.0.0.0"
+    web_port: int = 8080
+    backend_api_url: str = "http://mikrotrack-app:8000"
 
 
 def str_to_bool(value: str) -> bool:
@@ -89,4 +95,13 @@ def load_config() -> Config:
             os.getenv("PERSISTENCE_RETENTION_DAYS", "7"),
             variable_name="PERSISTENCE_RETENTION_DAYS",
         ),
+        api_enabled=str_to_bool(os.getenv("API_ENABLED", "true")),
+        api_host=os.getenv("API_HOST", "0.0.0.0").strip() or "0.0.0.0",
+        api_port=_parse_positive_int(os.getenv("API_PORT", "8000"), variable_name="API_PORT"),
+        web_host=os.getenv("WEB_HOST", "0.0.0.0").strip() or "0.0.0.0",
+        web_port=_parse_positive_int(os.getenv("WEB_PORT", "8080"), variable_name="WEB_PORT"),
+        backend_api_url=os.getenv(
+            "BACKEND_API_URL", "http://mikrotrack-app:8000"
+        ).strip()
+        or "http://mikrotrack-app:8000",
     )

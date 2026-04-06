@@ -4,8 +4,11 @@ import json
 import logging
 import signal
 import sys
+import threading
 import time
 from types import FrameType
+
+import uvicorn
 
 from app.collector import get_arp_entries, get_dhcp_leases
 from app.config import Config, load_config
@@ -56,6 +59,21 @@ def _run_once(config: Config, logger: logging.Logger) -> list[dict[str, object]]
     return devices
 
 
+
+def _run_api_server(config: Config, logger: logging.Logger) -> threading.Thread:
+    def _serve() -> None:
+        uvicorn.run(
+            "app.api.main:app",
+            host=config.api_host,
+            port=config.api_port,
+            log_level=config.log_level.lower(),
+        )
+
+    logger.info("Starting API server on %s:%s", config.api_host, config.api_port)
+    thread = threading.Thread(target=_serve, daemon=True, name="mikrotrack-api")
+    thread.start()
+    return thread
+
 def _register_signal_handlers(logger: logging.Logger) -> list[bool]:
     should_stop = [False]
 
@@ -89,7 +107,7 @@ def main() -> None:
             "Loaded config: host=%s, port=%s, username=%s, use_ssl=%s, "
             "ssl_verify=%s, log_level=%s, print_result_to_stdout=%s, "
             "run_mode=%s, collection_interval=%ss, persistence_enabled=%s, "
-            "persistence_path=%s, persistence_retention_days=%s"
+            "persistence_path=%s, persistence_retention_days=%s, api_enabled=%s, api_host=%s, api_port=%s, backend_api_url=%s"
         ),
         config.mikrotik_host,
         config.mikrotik_port,
@@ -103,6 +121,10 @@ def main() -> None:
         config.persistence_enabled,
         config.persistence_path,
         config.persistence_retention_days,
+        config.api_enabled,
+        config.api_host,
+        config.api_port,
+        config.backend_api_url,
     )
 
     if config.persistence_enabled:
@@ -111,6 +133,9 @@ def main() -> None:
             config.persistence_retention_days,
         )
         validate_persistence()
+
+    if config.api_enabled:
+        _run_api_server(config, logger)
 
     if config.run_mode == "once":
         logger.info("Starting in ONCE mode")
