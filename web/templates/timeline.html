@@ -69,7 +69,7 @@
 
       .toolbar {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) minmax(180px, 220px) auto;
+        grid-template-columns: minmax(220px, 1fr) minmax(170px, 220px) minmax(170px, 220px) auto;
         gap: 10px;
       }
 
@@ -157,6 +157,15 @@
         font-size: 0.75rem;
       }
 
+      .changes {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .changes li + li {
+        margin-top: 4px;
+      }
+
       details > summary {
         cursor: pointer;
         color: var(--accent);
@@ -205,12 +214,16 @@
 
       <section class="panel">
         <div class="toolbar">
-          <input id="search" type="text" placeholder="Filter by MAC or details..." />
+          <input id="mac-filter" type="text" placeholder="Filter by MAC..." />
           <select id="event-type">
             <option value="">All event types</option>
             {% for event_type in event_types %}
             <option value="{{ event_type }}">{{ event_type }}</option>
             {% endfor %}
+          </select>
+          <select id="sort-order">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
           </select>
           <button id="reset-filters" type="button">Reset filters</button>
         </div>
@@ -222,25 +235,37 @@
                 <th>Time</th>
                 <th>Type</th>
                 <th>MAC</th>
+                <th>Changes</th>
                 <th>Details</th>
               </tr>
             </thead>
             <tbody id="events-table">
               {% for event in events %}
-              <tr data-event-type="{{ event.get('event_type', '-') }}" data-mac="{{ event.get('mac_address', '-') }}">
+              <tr
+                data-event-type="{{ event.get('event_type', '-') }}"
+                data-mac="{{ event.get('mac', '') }}"
+                data-ts="{{ event.get('timestamp', '') }}"
+              >
                 <td>{{ event.get('timestamp', '-') }}</td>
                 <td><span class="badge">{{ event.get('event_type', '-') }}</span></td>
-                <td><code>{{ event.get('mac_address', '-') }}</code></td>
+                <td><code>{{ event.get('mac', '') }}</code></td>
+                <td>
+                  <ul class="changes">
+                    {% for change in event.get('changes', []) %}
+                    <li>{{ change }}</li>
+                    {% endfor %}
+                  </ul>
+                </td>
                 <td>
                   <details>
-                    <summary>Show payload</summary>
-                    <pre>{{ event | tojson(indent=2) }}</pre>
+                    <summary>Expand JSON</summary>
+                    <pre>{{ event.get('events', []) | tojson(indent=2) }}</pre>
                   </details>
                 </td>
               </tr>
               {% else %}
               <tr id="empty-row">
-                <td class="empty" colspan="4">No events yet.</td>
+                <td class="empty" colspan="5">No events yet</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -250,9 +275,11 @@
     </main>
 
     <script>
-      const searchInput = document.getElementById("search");
+      const macInput = document.getElementById("mac-filter");
       const typeSelect = document.getElementById("event-type");
+      const sortOrderSelect = document.getElementById("sort-order");
       const resetButton = document.getElementById("reset-filters");
+      const tableBody = document.getElementById("events-table");
       const rows = Array.from(document.querySelectorAll("#events-table tr[data-event-type]"));
       const visibleCount = document.getElementById("visible-count");
       const totalCount = document.getElementById("total-count");
@@ -269,31 +296,45 @@
       };
 
       const filterRows = () => {
-        const searchValue = searchInput.value.trim().toLowerCase();
+        const macValue = macInput.value.trim().toLowerCase();
         const selectedType = typeSelect.value;
 
         rows.forEach((row) => {
           const type = row.dataset.eventType || "";
           const mac = row.dataset.mac || "";
-          const text = row.textContent.toLowerCase();
 
           const matchType = !selectedType || type === selectedType;
-          const matchSearch = !searchValue || mac.toLowerCase().includes(searchValue) || text.includes(searchValue);
+          const matchMac = !macValue || mac.toLowerCase().includes(macValue);
 
-          row.style.display = matchType && matchSearch ? "table-row" : "none";
+          row.style.display = matchType && matchMac ? "table-row" : "none";
         });
 
         setCounts();
       };
 
-      searchInput.addEventListener("input", filterRows);
+      const sortRows = () => {
+        const direction = sortOrderSelect.value;
+        const sortedRows = [...rows].sort((left, right) => {
+          const leftTs = Date.parse(left.dataset.ts || "") || 0;
+          const rightTs = Date.parse(right.dataset.ts || "") || 0;
+          return direction === "oldest" ? leftTs - rightTs : rightTs - leftTs;
+        });
+
+        sortedRows.forEach((row) => tableBody.appendChild(row));
+      };
+
+      macInput.addEventListener("input", filterRows);
       typeSelect.addEventListener("change", filterRows);
+      sortOrderSelect.addEventListener("change", sortRows);
       resetButton.addEventListener("click", () => {
-        searchInput.value = "";
+        macInput.value = "";
         typeSelect.value = "";
+        sortOrderSelect.value = "newest";
+        sortRows();
         filterRows();
       });
 
+      sortRows();
       setCounts();
     </script>
   </body>
