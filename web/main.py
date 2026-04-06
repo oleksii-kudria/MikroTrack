@@ -32,11 +32,17 @@ async def timeline(request: Request) -> HTMLResponse:
     except Exception as error:
         error_message = f"Unable to load events from API: {error}"
 
+    timeline_events = list(reversed(events))
+    event_types = sorted(
+        {str(event.get("event_type", "-")) for event in timeline_events if event.get("event_type")}
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="timeline.html",
         context={
-            "events": list(reversed(events)),
+            "events": timeline_events,
+            "event_types": event_types,
             "backend_api_url": BACKEND_API_URL,
             "error_message": error_message,
         },
