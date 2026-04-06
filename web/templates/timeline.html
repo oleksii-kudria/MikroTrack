@@ -498,7 +498,7 @@
       const loadDevices = async () => {
         devicesTable.innerHTML = '<tr><td class="empty" colspan="6">Loading devices...</td></tr>';
         try {
-          const response = await fetch("{{ backend_api_url }}/api/devices", { cache: "no-store" });
+          const response = await fetch("/api/devices", { cache: "no-store" });
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
           }
