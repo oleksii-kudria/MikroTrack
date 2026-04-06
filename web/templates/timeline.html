@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MikroTrack Timeline</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      h1 { margin-bottom: 8px; }
+      .muted { color: #666; }
+      .error { color: #c62828; margin: 12px 0; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+      th { background: #f4f4f4; }
+      code { background: #f8f8f8; padding: 1px 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>MikroTrack Timeline</h1>
+    <p class="muted">Backend API: <code>{{ backend_api_url }}</code></p>
+
+    {% if error_message %}
+    <p class="error">{{ error_message }}</p>
+    {% endif %}
+
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Type</th>
+          <th>MAC</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td>{{ event.get('timestamp', '-') }}</td>
+          <td>{{ event.get('event_type', '-') }}</td>
+          <td>{{ event.get('mac_address', '-') }}</td>
+          <td><code>{{ event }}</code></td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No events yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

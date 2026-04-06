@@ -1,0 +1,1 @@
+"""MikroTrack Web UI package."""

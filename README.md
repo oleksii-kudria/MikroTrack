@@ -13,10 +13,10 @@ MikroTrack — це lightweight collector для моніторингу мере
 
 ### Архітектура (коротко)
 
-- лише collector
-- persistence через JSON snapshots
-- без API
-- без UI
+- collector + API (app container)
+- persistence через JSON snapshots + events.jsonl
+- web UI (окремий web container)
+- без окремої БД
 
 ### Quick Start
 
@@ -36,6 +36,10 @@ docker compose up --build
 - `PERSISTENCE_ENABLED`
 - `PERSISTENCE_PATH`
 - `PERSISTENCE_RETENTION_DAYS`
+- `API_ENABLED`
+- `API_HOST` / `API_PORT`
+- `WEB_HOST` / `WEB_PORT`
+- `BACKEND_API_URL`
 
 ### Persistence
 
@@ -101,10 +105,10 @@ Builds:
 
 ### Architecture (short)
 
-- collector only
-- JSON snapshot persistence
-- no API
-- no UI
+- collector + API (app container)
+- JSON snapshot + events.jsonl persistence
+- web UI (separate web container)
+- no dedicated DB
 
 ### Quick Start
 
@@ -124,6 +128,10 @@ docker compose up --build
 - `PERSISTENCE_ENABLED`
 - `PERSISTENCE_PATH`
 - `PERSISTENCE_RETENTION_DAYS`
+- `API_ENABLED`
+- `API_HOST` / `API_PORT`
+- `WEB_HOST` / `WEB_PORT`
+- `BACKEND_API_URL`
 
 ### Persistence
 
