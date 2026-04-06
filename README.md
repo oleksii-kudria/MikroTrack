@@ -55,6 +55,21 @@ PERSISTENCE_PATH=/data/snapshots
 PERSISTENCE_RETENTION_DAYS=7
 ```
 
+### Snapshot diff
+
+Після кожного нового snapshot (починаючи з другого файлу) застосунок виконує diff з попереднім snapshot та логує:
+
+- нові пристрої
+- зниклі пристрої
+- зміни IP
+- зміни hostname
+
+У логах також виводиться summary:
+
+- `new`
+- `removed`
+- `changed`
+
 ### Документація
 
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
@@ -120,6 +135,21 @@ PERSISTENCE_ENABLED=true
 PERSISTENCE_PATH=/data/snapshots
 PERSISTENCE_RETENTION_DAYS=7
 ```
+
+### Snapshot diff
+
+After each new snapshot (starting from the second file), the app computes a diff against the previous snapshot and logs:
+
+- new devices
+- removed devices
+- IP changes
+- hostname changes
+
+It also prints a diff summary with:
+
+- `new`
+- `removed`
+- `changed`
 
 ### Documentation
 

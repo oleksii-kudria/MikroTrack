@@ -74,6 +74,39 @@ chmod 755 /data/snapshots
 - `WARNING: Persistence path may not be mounted to host`  
   `Recommendation: Verify docker-compose volume mapping`
 
+## Snapshot diff (аналіз змін)
+
+Під час кожного нового збереження MikroTrack намагається порівняти поточний snapshot із попереднім файлом у `PERSISTENCE_PATH`.
+
+Якщо попереднього snapshot немає:
+
+- `[DIFF_SKIPPED] No previous snapshot found`
+
+Порівняння виконується за:
+
+- `mac_address` (primary key)
+- `ip_address`
+- `host_name`
+
+Події змін (DEBUG):
+
+- `[NEW_DEVICE] New device detected: {ip} ({mac})`
+- `[DEVICE_REMOVED] Device disappeared: {ip} ({mac})`
+- `[IP_CHANGED] Device IP changed: {mac} {old_ip} -> {new_ip}`
+- `[HOSTNAME_CHANGED] Hostname changed: {mac} {old} -> {new}`
+
+Підсумок змін (INFO):
+
+- `Diff summary:`
+- `- new: X`
+- `- removed: X`
+- `- changed: X`
+
+Помилки обробки diff:
+
+- `[DIFF_ERROR] Failed to process snapshots`
+- `Recommendation: Verify snapshot format and integrity`
+
 ## Docker volume mapping
 
 Приклад мапінгу volume у `docker-compose.yml`:
@@ -160,6 +193,39 @@ Typical messages:
   `Recommendation: Clean up old snapshots or increase storage`
 - `WARNING: Persistence path may not be mounted to host`  
   `Recommendation: Verify docker-compose volume mapping`
+
+## Snapshot diff (change analysis)
+
+On every new save, MikroTrack attempts to compare the current snapshot with the latest previous file in `PERSISTENCE_PATH`.
+
+If no previous snapshot exists:
+
+- `[DIFF_SKIPPED] No previous snapshot found`
+
+Comparison keys:
+
+- `mac_address` (primary key)
+- `ip_address`
+- `host_name`
+
+Change events (DEBUG):
+
+- `[NEW_DEVICE] New device detected: {ip} ({mac})`
+- `[DEVICE_REMOVED] Device disappeared: {ip} ({mac})`
+- `[IP_CHANGED] Device IP changed: {mac} {old_ip} -> {new_ip}`
+- `[HOSTNAME_CHANGED] Hostname changed: {mac} {old} -> {new}`
+
+Diff summary (INFO):
+
+- `Diff summary:`
+- `- new: X`
+- `- removed: X`
+- `- changed: X`
+
+Diff error handling:
+
+- `[DIFF_ERROR] Failed to process snapshots`
+- `Recommendation: Verify snapshot format and integrity`
 
 ## Docker volume mapping
 
