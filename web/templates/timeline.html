@@ -5,47 +5,296 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MikroTrack Timeline</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 20px; }
-      h1 { margin-bottom: 8px; }
-      .muted { color: #666; }
-      .error { color: #c62828; margin: 12px 0; }
-      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
-      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
-      th { background: #f4f4f4; }
-      code { background: #f8f8f8; padding: 1px 4px; }
+      :root {
+        color-scheme: light;
+        --bg: #f3f5f9;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --accent: #2563eb;
+        --accent-soft: #dbeafe;
+        --ok: #166534;
+        --ok-bg: #dcfce7;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.8rem;
+      }
+
+      .muted {
+        color: var(--muted);
+        margin-top: 6px;
+      }
+
+      .code-chip {
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.85rem;
+      }
+
+      .panel {
+        margin-top: 16px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(180px, 220px) auto;
+        gap: 10px;
+      }
+
+      input, select {
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 0.92rem;
+      }
+
+      button {
+        border: 1px solid #93c5fd;
+        border-radius: 8px;
+        padding: 10px 14px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        cursor: pointer;
+      }
+
+      .stats {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .stat {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.88rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: #f8fafc;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--ok);
+      }
+
+      .error {
+        color: #991b1b;
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        border-radius: 8px;
+        margin: 14px 0 0;
+        padding: 10px;
+      }
+
+      .table-wrap {
+        margin-top: 12px;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--card);
+      }
+
+      th, td {
+        border-bottom: 1px solid var(--border);
+        padding: 10px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 0.9rem;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        background: #f8fafc;
+        z-index: 1;
+      }
+
+      .badge {
+        display: inline-block;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: #1e40af;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+      }
+
+      details > summary {
+        cursor: pointer;
+        color: var(--accent);
+      }
+
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 6px 0 0;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 0.8rem;
+      }
+
+      .empty {
+        padding: 22px;
+        text-align: center;
+        color: var(--muted);
+      }
+
+      @media (max-width: 760px) {
+        .toolbar {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
-    <h1>MikroTrack Timeline</h1>
-    <p class="muted">Backend API: <code>{{ backend_api_url }}</code></p>
+    <main class="container">
+      <header class="header">
+        <div>
+          <h1>MikroTrack Timeline</h1>
+          <p class="muted">Recent events fetched from <span class="code-chip">{{ backend_api_url }}</span></p>
+        </div>
+        <div class="stats">
+          <span class="stat"><span class="dot"></span>Loaded: <strong id="visible-count">{{ events|length }}</strong></span>
+          <span class="stat">Total: <strong id="total-count">{{ events|length }}</strong></span>
+        </div>
+      </header>
 
-    {% if error_message %}
-    <p class="error">{{ error_message }}</p>
-    {% endif %}
+      {% if error_message %}
+      <p class="error">{{ error_message }}</p>
+      {% endif %}
 
-    <table>
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Type</th>
-          <th>MAC</th>
-          <th>Details</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for event in events %}
-        <tr>
-          <td>{{ event.get('timestamp', '-') }}</td>
-          <td>{{ event.get('event_type', '-') }}</td>
-          <td>{{ event.get('mac_address', '-') }}</td>
-          <td><code>{{ event }}</code></td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="4">No events yet.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+      <section class="panel">
+        <div class="toolbar">
+          <input id="search" type="text" placeholder="Filter by MAC or details..." />
+          <select id="event-type">
+            <option value="">All event types</option>
+            {% for event_type in event_types %}
+            <option value="{{ event_type }}">{{ event_type }}</option>
+            {% endfor %}
+          </select>
+          <button id="reset-filters" type="button">Reset filters</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>MAC</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="events-table">
+              {% for event in events %}
+              <tr data-event-type="{{ event.get('event_type', '-') }}" data-mac="{{ event.get('mac_address', '-') }}">
+                <td>{{ event.get('timestamp', '-') }}</td>
+                <td><span class="badge">{{ event.get('event_type', '-') }}</span></td>
+                <td><code>{{ event.get('mac_address', '-') }}</code></td>
+                <td>
+                  <details>
+                    <summary>Show payload</summary>
+                    <pre>{{ event | tojson(indent=2) }}</pre>
+                  </details>
+                </td>
+              </tr>
+              {% else %}
+              <tr id="empty-row">
+                <td class="empty" colspan="4">No events yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const searchInput = document.getElementById("search");
+      const typeSelect = document.getElementById("event-type");
+      const resetButton = document.getElementById("reset-filters");
+      const rows = Array.from(document.querySelectorAll("#events-table tr[data-event-type]"));
+      const visibleCount = document.getElementById("visible-count");
+      const totalCount = document.getElementById("total-count");
+      const emptyRow = document.getElementById("empty-row");
+
+      const setCounts = () => {
+        const visibleRows = rows.filter((row) => row.style.display !== "none").length;
+        visibleCount.textContent = String(visibleRows);
+        totalCount.textContent = String(rows.length);
+
+        if (emptyRow) {
+          emptyRow.style.display = visibleRows === 0 ? "table-row" : "none";
+        }
+      };
+
+      const filterRows = () => {
+        const searchValue = searchInput.value.trim().toLowerCase();
+        const selectedType = typeSelect.value;
+
+        rows.forEach((row) => {
+          const type = row.dataset.eventType || "";
+          const mac = row.dataset.mac || "";
+          const text = row.textContent.toLowerCase();
+
+          const matchType = !selectedType || type === selectedType;
+          const matchSearch = !searchValue || mac.toLowerCase().includes(searchValue) || text.includes(searchValue);
+
+          row.style.display = matchType && matchSearch ? "table-row" : "none";
+        });
+
+        setCounts();
+      };
+
+      searchInput.addEventListener("input", filterRows);
+      typeSelect.addEventListener("change", filterRows);
+      resetButton.addEventListener("click", () => {
+        searchInput.value = "";
+        typeSelect.value = "";
+        filterRows();
+      });
+
+      setCounts();
+    </script>
   </body>
 </html>
