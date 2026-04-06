@@ -14,7 +14,7 @@ from app.errors import to_mikrotrack_error
 from app.exceptions import MikroTrackError
 from app.logging_config import setup_logging
 from app.mikrotik_client import MikroTikClient
-from app.persistence import configure_persistence, save_snapshot
+from app.persistence import configure_persistence, save_snapshot, validate_persistence
 from app.sanitizer import sanitize
 
 RETRY_BACKOFF_SECONDS = 10
@@ -110,6 +110,7 @@ def main() -> None:
             config.persistence_path,
             config.persistence_retention_days,
         )
+        validate_persistence()
 
     if config.run_mode == "once":
         logger.info("Starting in ONCE mode")

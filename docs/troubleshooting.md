@@ -59,6 +59,20 @@
 - уникати надмірно обмеженої custom-групи
 - перевірити доступ до команди напряму в RouterOS terminal
 
+## persistence errors
+
+Симптоми:
+
+- `[PERSISTENCE_ERROR]` у логах під час старту
+- snapshot-файли не створюються у `PERSISTENCE_PATH`
+
+Перевірки:
+
+- директорія `PERSISTENCE_PATH` існує та доступна на запис
+- Docker volume змонтований: `- /data/snapshots:/data/snapshots`
+- на хості достатньо вільного місця (мінімум 50MB)
+- користувач контейнера має права на директорію
+
 ---
 
 ## 🇬🇧 English
@@ -119,3 +133,17 @@ Fix:
 - verify group policies include at least `read,api`
 - avoid using over-restricted custom group
 - test command access directly in RouterOS terminal
+
+## persistence errors
+
+Symptoms:
+
+- `[PERSISTENCE_ERROR]` in startup logs
+- snapshots are not created in `PERSISTENCE_PATH`
+
+Checks:
+
+- `PERSISTENCE_PATH` exists and is writable
+- Docker volume is mapped: `- /data/snapshots:/data/snapshots`
+- host has enough free space (at least 50MB)
+- container user has directory permissions

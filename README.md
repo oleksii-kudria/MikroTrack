@@ -44,6 +44,7 @@ Snapshot-файли зберігаються у директорії `PERSISTENC
 - Формат імені: `YYYY-MM-DDTHH-MM-SS.json`
 - Збереження вмикається через `PERSISTENCE_ENABLED=true`
 - Автоматично створюється директорія, якщо її ще немає
+- На старті виконується перевірка шляху, прав запису та вільного місця
 - Старі файли видаляються за політикою `PERSISTENCE_RETENTION_DAYS`
 
 Приклад:
@@ -109,6 +110,7 @@ Snapshot files are stored in `PERSISTENCE_PATH`.
 - File name format: `YYYY-MM-DDTHH-MM-SS.json`
 - Enable via `PERSISTENCE_ENABLED=true`
 - Directory is created automatically if missing
+- On startup, path, write permissions, and free disk space are validated
 - Old files are removed using `PERSISTENCE_RETENTION_DAYS`
 
 Example:
