@@ -13,6 +13,10 @@ logger = logging.getLogger("mikrotrack")
 _persistence_path = Path("/data/snapshots")
 _retention_days = 7
 _LOW_DISK_SPACE_THRESHOLD_BYTES = 50 * 1024 * 1024
+_EVENTS_FILENAME = "events.jsonl"
+
+
+Event = dict[str, Any]
 
 
 def configure_persistence(path: str, retention_days: int) -> None:
@@ -126,10 +130,72 @@ def _index_devices_by_mac(devices: list[dict[str, Any]]) -> dict[str, dict[str, 
     return indexed
 
 
-def _log_device_diff(previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]) -> None:
+def _iso_timestamp() -> str:
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _source_value(device: dict[str, Any]) -> str:
+    source = device.get("source", [])
+    if isinstance(source, list):
+        cleaned = sorted(str(item).strip() for item in source if str(item).strip())
+        return "+".join(cleaned)
+    return str(source).strip()
+
+
+def _get_nested_flag(device: dict[str, Any], container_key: str, flag_key: str) -> bool:
+    container = device.get(container_key, {})
+    if not isinstance(container, dict):
+        return False
+    return bool(container.get(flag_key, False))
+
+
+def _build_event(
+    event_type: str,
+    mac: str,
+    *,
+    old_value: Any | None = None,
+    new_value: Any | None = None,
+) -> Event:
+    event: Event = {
+        "timestamp": _iso_timestamp(),
+        "event_type": event_type,
+        "mac": mac,
+    }
+    if old_value is not None:
+        event["old_value"] = old_value
+    if new_value is not None:
+        event["new_value"] = new_value
+    return event
+
+
+def _log_event(event: Event) -> None:
+    details: list[str] = []
+    if "old_value" in event:
+        details.append(f"old={event['old_value']}")
+    if "new_value" in event:
+        details.append(f"new={event['new_value']}")
+
+    suffix = f" ({', '.join(details)})" if details else ""
+    logger.debug("[%s] Event generated for %s%s", event["event_type"], event["mac"], suffix)
+
+
+def _append_events(events: list[Event]) -> None:
+    if not events:
+        return
+
+    events_path = _persistence_path / _EVENTS_FILENAME
+    with events_path.open("a", encoding="utf-8") as events_file:
+        for event in events:
+            events_file.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+    logger.info("Events persisted: %d -> %s", len(events), events_path)
+
+
+def _generate_diff_events(previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]) -> list[Event]:
     previous_by_mac = _index_devices_by_mac(previous_devices)
     current_by_mac = _index_devices_by_mac(current_devices)
 
+    events: list[Event] = []
     new_count = 0
     removed_count = 0
     changed_count = 0
@@ -143,18 +209,19 @@ def _log_device_diff(previous_devices: list[dict[str, Any]], current_devices: li
                 current.get("ip_address", ""),
                 mac,
             )
+            event = _build_event("NEW_DEVICE", mac)
+            events.append(event)
+            _log_event(event)
             continue
 
         previous_ip = str(previous.get("ip_address", ""))
         current_ip = str(current.get("ip_address", ""))
         if previous_ip != current_ip:
             changed_count += 1
-            logger.debug(
-                "[IP_CHANGED] Device IP changed: %s %s -> %s",
-                mac,
-                previous_ip,
-                current_ip,
-            )
+            logger.debug("[IP_CHANGED] Device IP changed: %s %s -> %s", mac, previous_ip, current_ip)
+            event = _build_event("IP_CHANGED", mac, old_value=previous_ip, new_value=current_ip)
+            events.append(event)
+            _log_event(event)
 
         previous_hostname = str(previous.get("host_name", ""))
         current_hostname = str(current.get("host_name", ""))
@@ -166,29 +233,168 @@ def _log_device_diff(previous_devices: list[dict[str, Any]], current_devices: li
                 previous_hostname,
                 current_hostname,
             )
+            event = _build_event(
+                "HOSTNAME_CHANGED",
+                mac,
+                old_value=previous_hostname,
+                new_value=current_hostname,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_has_dhcp = "dhcp" in _source_value(previous).split("+")
+        current_has_dhcp = "dhcp" in _source_value(current).split("+")
+        if not previous_has_dhcp and current_has_dhcp:
+            changed_count += 1
+            logger.debug("[DHCP_ADDED] DHCP lease appeared")
+            event = _build_event("DHCP_ADDED", mac)
+            events.append(event)
+            _log_event(event)
+        elif previous_has_dhcp and not current_has_dhcp:
+            changed_count += 1
+            logger.debug("[DHCP_REMOVED] DHCP lease removed")
+            event = _build_event("DHCP_REMOVED", mac)
+            events.append(event)
+            _log_event(event)
+
+        previous_dhcp_dynamic = _get_nested_flag(previous, "dhcp_flags", "dynamic")
+        current_dhcp_dynamic = _get_nested_flag(current, "dhcp_flags", "dynamic")
+        if previous_dhcp_dynamic != current_dhcp_dynamic:
+            changed_count += 1
+            logger.debug(
+                "[DHCP_DYNAMIC_CHANGED] DHCP dynamic flag changed: %s -> %s",
+                previous_dhcp_dynamic,
+                current_dhcp_dynamic,
+            )
+            event = _build_event(
+                "DHCP_DYNAMIC_CHANGED",
+                mac,
+                old_value=previous_dhcp_dynamic,
+                new_value=current_dhcp_dynamic,
+            )
+            events.append(event)
+            _log_event(event)
+
+            assignment_old = "dynamic" if previous_dhcp_dynamic else "static"
+            assignment_new = "dynamic" if current_dhcp_dynamic else "static"
+            logger.debug(
+                "[DEVICE_IP_ASSIGNMENT_CHANGED] IP assignment changed: %s -> %s",
+                assignment_old,
+                assignment_new,
+            )
+            event = _build_event(
+                "DEVICE_IP_ASSIGNMENT_CHANGED",
+                mac,
+                old_value=assignment_old,
+                new_value=assignment_new,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_dhcp_status = str(previous.get("dhcp_status", "unknown"))
+        current_dhcp_status = str(current.get("dhcp_status", "unknown"))
+        if previous_dhcp_status != current_dhcp_status:
+            changed_count += 1
+            logger.debug("[DHCP_STATUS_CHANGED] DHCP status changed")
+            event = _build_event(
+                "DHCP_STATUS_CHANGED",
+                mac,
+                old_value=previous_dhcp_status,
+                new_value=current_dhcp_status,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_dhcp_comment = str(previous.get("dhcp_comment", ""))
+        current_dhcp_comment = str(current.get("dhcp_comment", ""))
+        if previous_dhcp_comment != current_dhcp_comment:
+            changed_count += 1
+            logger.debug("[DHCP_COMMENT_CHANGED] DHCP comment changed")
+            event = _build_event(
+                "DHCP_COMMENT_CHANGED",
+                mac,
+                old_value=previous_dhcp_comment,
+                new_value=current_dhcp_comment,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_has_arp = "arp" in _source_value(previous).split("+")
+        current_has_arp = "arp" in _source_value(current).split("+")
+        if not previous_has_arp and current_has_arp:
+            changed_count += 1
+            logger.debug("[ARP_ADDED] ARP entry appeared")
+            event = _build_event("ARP_ADDED", mac)
+            events.append(event)
+            _log_event(event)
+        elif previous_has_arp and not current_has_arp:
+            changed_count += 1
+            logger.debug("[ARP_REMOVED] ARP entry removed")
+            event = _build_event("ARP_REMOVED", mac)
+            events.append(event)
+            _log_event(event)
+
+        previous_arp_dynamic = _get_nested_flag(previous, "arp_flags", "dynamic")
+        current_arp_dynamic = _get_nested_flag(current, "arp_flags", "dynamic")
+        if previous_arp_dynamic != current_arp_dynamic:
+            changed_count += 1
+            logger.debug("[ARP_DYNAMIC_CHANGED] ARP dynamic flag changed")
+            event = _build_event(
+                "ARP_DYNAMIC_CHANGED",
+                mac,
+                old_value=previous_arp_dynamic,
+                new_value=current_arp_dynamic,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_arp_flags = previous.get("arp_flags", {})
+        current_arp_flags = current.get("arp_flags", {})
+        if previous_arp_flags != current_arp_flags:
+            changed_count += 1
+            logger.debug("[ARP_FLAG_CHANGED] ARP flags changed")
+            event = _build_event(
+                "ARP_FLAG_CHANGED",
+                mac,
+                old_value=previous_arp_flags,
+                new_value=current_arp_flags,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_source = _source_value(previous)
+        current_source = _source_value(current)
+        if previous_source != current_source:
+            changed_count += 1
+            logger.debug("[SOURCE_CHANGED] Device source changed: %s -> %s", previous_source, current_source)
+            event = _build_event("SOURCE_CHANGED", mac, old_value=previous_source, new_value=current_source)
+            events.append(event)
+            _log_event(event)
 
     for mac, previous in previous_by_mac.items():
         if mac in current_by_mac:
             continue
 
         removed_count += 1
-        logger.debug(
-            "[DEVICE_REMOVED] Device disappeared: %s (%s)",
-            previous.get("ip_address", ""),
-            mac,
-        )
+        logger.debug("[DEVICE_REMOVED] Device disappeared: %s (%s)", previous.get("ip_address", ""), mac)
+        event = _build_event("DEVICE_REMOVED", mac)
+        events.append(event)
+        _log_event(event)
 
     logger.info("Diff summary:")
     logger.info("- new: %d", new_count)
     logger.info("- removed: %d", removed_count)
     logger.info("- changed: %d", changed_count)
+    logger.info("- events: %d", len(events))
+
+    return events
 
 
-def process_snapshot_diff(current_devices: list[dict[str, Any]]) -> None:
+def process_snapshot_diff(current_devices: list[dict[str, Any]]) -> list[Event]:
     previous_snapshot_path = _latest_snapshot_path()
     if previous_snapshot_path is None:
         logger.info("[DIFF_SKIPPED] No previous snapshot found")
-        return
+        return []
 
     try:
         with previous_snapshot_path.open("r", encoding="utf-8") as snapshot_file:
@@ -196,10 +402,13 @@ def process_snapshot_diff(current_devices: list[dict[str, Any]]) -> None:
         if not isinstance(previous_devices, list):
             raise ValueError("Snapshot payload is not a list")
 
-        _log_device_diff(previous_devices, current_devices)
+        events = _generate_diff_events(previous_devices, current_devices)
+        _append_events(events)
+        return events
     except Exception:
         logger.error("[DIFF_ERROR] Failed to process snapshots")
         logger.error("Recommendation: Verify snapshot format and integrity")
+        return []
 
 
 def save_snapshot(devices: list[dict]) -> None:

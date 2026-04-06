@@ -55,20 +55,27 @@ PERSISTENCE_PATH=/data/snapshots
 PERSISTENCE_RETENTION_DAYS=7
 ```
 
-### Snapshot diff
+### Event-driven diff
 
-Після кожного нового snapshot (починаючи з другого файлу) застосунок виконує diff з попереднім snapshot та логує:
+Після кожного нового snapshot (починаючи з другого файлу) застосунок виконує event-driven diff з попереднім snapshot за `mac_address` і фіксує кожну зміну стану пристрою.
 
-- нові пристрої
-- зниклі пристрої
-- зміни IP
-- зміни hostname
+Логи (DEBUG) містять події:
 
-У логах також виводиться summary:
+- presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
+- DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
+- ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
+- source: `SOURCE_CHANGED`
+- combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
+
+Кожна подія має timestamp та серіалізується у `events.jsonl` в `PERSISTENCE_PATH` (готовність для web UI).
+
+У логах INFO є summary:
 
 - `new`
 - `removed`
 - `changed`
+- `events`
 
 ### Документація
 
@@ -136,20 +143,27 @@ PERSISTENCE_PATH=/data/snapshots
 PERSISTENCE_RETENTION_DAYS=7
 ```
 
-### Snapshot diff
+### Event-driven diff
 
-After each new snapshot (starting from the second file), the app computes a diff against the previous snapshot and logs:
+After each new snapshot (starting from the second file), the app computes an event-driven diff against the previous snapshot keyed by `mac_address` and records every device state transition.
 
-- new devices
-- removed devices
-- IP changes
-- hostname changes
+DEBUG logs include events:
 
-It also prints a diff summary with:
+- presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
+- DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
+- ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
+- source: `SOURCE_CHANGED`
+- combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
+
+Each event has a timestamp and is persisted to `events.jsonl` under `PERSISTENCE_PATH` (ready for web UI integration).
+
+INFO logs include a summary with:
 
 - `new`
 - `removed`
 - `changed`
+- `events`
 
 ### Documentation
 
