@@ -94,6 +94,21 @@ def _comment_text(dhcp_comment: str, arp_comment: str) -> str:
     return "-"
 
 
+def _comment_badge_label(dhcp_comment: str, arp_comment: str) -> str:
+    dhcp_text = (dhcp_comment or "").strip()
+    arp_text = (arp_comment or "").strip()
+
+    if dhcp_text and arp_text:
+        if dhcp_text == arp_text:
+            return f"DHCP+ARP: {dhcp_text}"
+        return f"DHCP: {dhcp_text} | ARP: {arp_text}"
+    if dhcp_text:
+        return f"DHCP: {dhcp_text}"
+    if arp_text:
+        return f"ARP: {arp_text}"
+    return "-"
+
+
 def _is_active(device: dict[str, Any]) -> bool:
     dhcp_status = str(device.get("dhcp_status", "")).lower()
     arp_status = str(device.get("arp_status", "")).lower()
@@ -200,6 +215,12 @@ def list_devices() -> dict[str, object]:
                 "mac": mac,
                 "ip": device.get("ip_address", ""),
                 "hostname": device.get("host_name", ""),
+                "dhcp_comment": str(device.get("dhcp_comment", "")),
+                "arp_comment": str(device.get("arp_comment", "")),
+                "comments_badge": _comment_badge_label(
+                    str(device.get("dhcp_comment", "")),
+                    str(device.get("arp_comment", "")),
+                ),
                 "comments": _comment_text(
                     str(device.get("dhcp_comment", "")),
                     str(device.get("arp_comment", "")),

@@ -189,7 +189,8 @@
       }
 
       .badge {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         border-radius: 999px;
         background: var(--accent-soft);
         color: #1e40af;
@@ -197,14 +198,65 @@
         font-size: 0.75rem;
       }
 
-      .state-active {
-        background: var(--ok-bg);
-        color: var(--ok);
+      .badge-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
-      .state-inactive {
-        background: #fee2e2;
-        color: #991b1b;
+      .badge-blue {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+
+      .badge-purple {
+        background: #ede9fe;
+        color: #5b21b6;
+      }
+
+      .badge-yellow {
+        background: #fef9c3;
+        color: #a16207;
+      }
+
+      .badge-green {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .badge-gray {
+        background: #e5e7eb;
+        color: #4b5563;
+      }
+
+      .badge-orange {
+        background: #ffedd5;
+        color: #c2410c;
+      }
+
+      .badge-comment {
+        max-width: 380px;
+      }
+
+      .status-mac {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .status-active {
+        background: #16a34a;
+      }
+
+      .status-inactive {
+        background: #dc2626;
       }
 
       .changes {
@@ -468,10 +520,87 @@
         return `${Math.floor(seconds / 3600)}h ago`;
       };
 
-      const buildStateLabel = (flags) => {
-        const state = flags.state || "inactive";
-        const cls = state === "active" ? "state-active" : "state-inactive";
-        return `<span class="badge ${cls}">${state}</span>`;
+      const escapeHtml = (value) =>
+        String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+
+      const badge = (label, cssClass, tooltip) =>
+        `<span class="badge ${cssClass}" title="${escapeHtml(tooltip || label)}">${escapeHtml(label)}</span>`;
+
+      const buildFlagsBadges = (flags) => {
+        const items = [];
+        const source = String(flags.source || "").toLowerCase();
+        const isDhcpSource = source.includes("dhcp");
+        const isArpSource = source.includes("arp");
+
+        if (isDhcpSource) {
+          items.push(badge("DHCP", "badge-blue", "Source: dhcp"));
+        }
+        if (isArpSource) {
+          items.push(badge("ARP", "badge-purple", "Source: arp"));
+        }
+
+        const assignment = String(flags.ip_assignment || "").toLowerCase();
+        if (assignment === "dynamic") {
+          items.push(badge("D", "badge-yellow", "Lease: dynamic"));
+        } else if (assignment === "static") {
+          items.push(badge("S", "badge-blue", "Lease: static"));
+        }
+
+        const dhcpStatus = String(flags.dhcp_status || "unknown").toLowerCase();
+        if (dhcpStatus === "bound") {
+          items.push(badge("B", "badge-green", "DHCP status: bound"));
+        } else {
+          items.push(badge("U", "badge-gray", `DHCP status: ${dhcpStatus || "unknown"}`));
+        }
+
+        const arpFlags = String(flags.arp_flags || "").toLowerCase();
+        const hasArpDynamic = arpFlags.includes("dynamic");
+        const hasArpComplete = arpFlags.includes("complete");
+        if (hasArpDynamic && hasArpComplete) {
+          items.push(badge("AD+C", "badge-orange", "ARP flags: dynamic + complete"));
+        } else if (hasArpDynamic) {
+          items.push(badge("AD", "badge-orange", "ARP flags: dynamic"));
+        } else if (hasArpComplete) {
+          items.push(badge("C", "badge-gray", "ARP flags: complete"));
+        }
+
+        if (!items.length) {
+          items.push(badge("-", "badge-gray", "No flags"));
+        }
+
+        return `<div class="badge-wrap">${items.join("")}</div>`;
+      };
+
+      const buildCommentBadges = (item) => {
+        const dhcpComment = String(item.dhcp_comment || "").trim();
+        const arpComment = String(item.arp_comment || "").trim();
+        if (!dhcpComment && !arpComment) {
+          return '<span class="badge badge-gray" title="No comments">-</span>';
+        }
+
+        if (dhcpComment && arpComment && dhcpComment === arpComment) {
+          return `<span class="badge badge-purple badge-comment" title="${escapeHtml(`DHCP+ARP comment: ${dhcpComment}`)}">${escapeHtml(`DHCP+ARP: ${dhcpComment}`)}</span>`;
+        }
+
+        const items = [];
+        if (dhcpComment) {
+          items.push(`<span class="badge badge-blue badge-comment" title="${escapeHtml(`DHCP comment: ${dhcpComment}`)}">${escapeHtml(`DHCP: ${dhcpComment}`)}</span>`);
+        }
+        if (arpComment) {
+          items.push(`<span class="badge badge-purple badge-comment" title="${escapeHtml(`ARP comment: ${arpComment}`)}">${escapeHtml(`ARP: ${arpComment}`)}</span>`);
+        }
+        return `<div class="badge-wrap">${items.join("")}</div>`;
+      };
+
+      const buildStatusMac = (item) => {
+        const state = item.active ? "active" : "inactive";
+        const cls = item.active ? "status-active" : "status-inactive";
+        return `<span class="status-mac"><span class="status-dot ${cls}" title="${state}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
       };
 
       const renderDevices = (items) => {
@@ -483,20 +612,13 @@
         devicesTable.innerHTML = items
           .map((item) => {
             const flags = item.flags || {};
-            const comments = String(item.comments || "-").replace(/\n/g, "<br />");
             return `
               <tr>
-                <td><code>${item.mac || "-"}</code></td>
+                <td>${buildStatusMac(item)}</td>
                 <td>${item.ip || "-"}</td>
                 <td>${item.hostname || "-"}</td>
-                <td>${comments}</td>
-                <td>
-                  source: ${flags.source || "-"}<br />
-                  ${flags.ip_assignment || "-"}<br />
-                  dhcp: ${flags.dhcp_status || "-"}<br />
-                  arp: ${flags.arp_flags || "-"}<br />
-                  ${buildStateLabel(flags)}
-                </td>
+                <td>${buildCommentBadges(item)}</td>
+                <td>${buildFlagsBadges(flags)}</td>
                 <td>${fmtElapsed(Number(item.elapsed_seconds || 0))}</td>
               </tr>
             `;
