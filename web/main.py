@@ -6,6 +6,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from web.timeline_utils import group_events, parse_timestamp
 
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://mikrotrack-app:8000").rstrip("/")
 
@@ -32,16 +33,21 @@ async def timeline(request: Request) -> HTMLResponse:
     except Exception as error:
         error_message = f"Unable to load events from API: {error}"
 
-    timeline_events = list(reversed(events))
+    timeline_events = sorted(events, key=lambda event: parse_timestamp(event.get("timestamp")), reverse=True)
+    grouped_events = group_events(timeline_events)
     event_types = sorted(
-        {str(event.get("event_type", "-")) for event in timeline_events if event.get("event_type")}
+        {
+            str(event.get("event_type", "-"))
+            for event in timeline_events
+            if str(event.get("event_type", "")).strip()
+        }
     )
 
     return templates.TemplateResponse(
         request=request,
         name="timeline.html",
         context={
-            "events": timeline_events,
+            "events": grouped_events,
             "event_types": event_types,
             "backend_api_url": BACKEND_API_URL,
             "error_message": error_message,
