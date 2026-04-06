@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from web.timeline_utils import group_events, parse_timestamp
 
-BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://mikrotrack-app:8000").rstrip("/")
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000").rstrip("/")
 
 app = FastAPI(title="MikroTrack Web", version="0.1.0")
 templates = Jinja2Templates(directory="web/templates")
@@ -50,6 +50,7 @@ async def timeline(request: Request) -> HTMLResponse:
             "events": grouped_events,
             "event_types": event_types,
             "error_message": error_message,
+            "backend_api_url": BACKEND_API_URL,
         },
     )
 

@@ -250,7 +250,7 @@
       <header class="header">
         <div>
           <h1>MikroTrack</h1>
-          <p class="muted">Data fetched from <span class="code-chip">{{ backend_api_url }}</span></p>
+          <p class="muted" id="backend-source"></p>
           <div class="tabs">
             <button id="tab-timeline" class="tab-btn active" type="button">Timeline</button>
             <button id="tab-devices" class="tab-btn" type="button">Devices</button>
@@ -363,6 +363,15 @@
     </main>
 
     <script>
+      const BACKEND_API_URL = "{{ backend_api_url|default('', true) }}";
+      const apiUrl = BACKEND_API_URL || "http://localhost:8000";
+      const backendSource = document.getElementById("backend-source");
+      backendSource.textContent = "Data fetched from ";
+      const backendChip = document.createElement("span");
+      backendChip.className = "code-chip";
+      backendChip.textContent = apiUrl;
+      backendSource.appendChild(backendChip);
+
       const tabTimeline = document.getElementById("tab-timeline");
       const tabDevices = document.getElementById("tab-devices");
       const timelinePanel = document.getElementById("timeline-panel");
