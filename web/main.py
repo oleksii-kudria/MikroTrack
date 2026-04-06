@@ -4,7 +4,7 @@ import os
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from web.timeline_utils import group_events, parse_timestamp
 
@@ -49,7 +49,22 @@ async def timeline(request: Request) -> HTMLResponse:
         context={
             "events": grouped_events,
             "event_types": event_types,
-            "backend_api_url": BACKEND_API_URL,
             "error_message": error_message,
         },
     )
+
+
+@app.get("/api/devices")
+async def proxy_devices() -> JSONResponse:
+    devices_url = f"{BACKEND_API_URL}/api/devices"
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(devices_url)
+            response.raise_for_status()
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as error:
+        return JSONResponse(
+            status_code=502,
+            content={"items": [], "error": f"Unable to load devices from API: {error}"},
+        )
