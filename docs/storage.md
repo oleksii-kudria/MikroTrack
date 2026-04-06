@@ -46,6 +46,34 @@ mkdir -p /data/snapshots
 chmod 755 /data/snapshots
 ```
 
+## Перевірки надійності (storage robustness)
+
+Під час старту, якщо `PERSISTENCE_ENABLED=true`, MikroTrack виконує перевірки:
+
+- валідація `PERSISTENCE_PATH`
+- автостворення директорії (якщо її немає)
+- тест запису у директорію
+- перевірка вільного місця (<50MB)
+- попередження про можливу відсутність Docker volume mapping
+
+Логи успішної ініціалізації:
+
+- `Persistence enabled: true`
+- `Persistence path: /data/snapshots`
+
+Типові повідомлення:
+
+- `[PERSISTENCE_ERROR] Persistence path is not writable or does not exist`  
+  `Recommendation: Verify volume mapping and directory permissions on host`
+- `[PERSISTENCE_ERROR] Failed to create persistence directory`  
+  `Recommendation: Check permissions or create directory manually on host`
+- `[PERSISTENCE_ERROR] Persistence path is not writable`  
+  `Recommendation: Check filesystem permissions and Docker volume mapping`
+- `[LOW_DISK_SPACE] Available disk space is low (<50MB)`  
+  `Recommendation: Clean up old snapshots or increase storage`
+- `WARNING: Persistence path may not be mounted to host`  
+  `Recommendation: Verify docker-compose volume mapping`
+
 ## Docker volume mapping
 
 Приклад мапінгу volume у `docker-compose.yml`:
@@ -104,6 +132,34 @@ Linux/Container example:
 mkdir -p /data/snapshots
 chmod 755 /data/snapshots
 ```
+
+## Storage robustness checks
+
+At startup, when `PERSISTENCE_ENABLED=true`, MikroTrack runs:
+
+- `PERSISTENCE_PATH` validation
+- automatic directory creation (if missing)
+- write probe for path permissions
+- free disk space check (<50MB)
+- warning when Docker volume mapping may be missing
+
+Initialization logs:
+
+- `Persistence enabled: true`
+- `Persistence path: /data/snapshots`
+
+Typical messages:
+
+- `[PERSISTENCE_ERROR] Persistence path is not writable or does not exist`  
+  `Recommendation: Verify volume mapping and directory permissions on host`
+- `[PERSISTENCE_ERROR] Failed to create persistence directory`  
+  `Recommendation: Check permissions or create directory manually on host`
+- `[PERSISTENCE_ERROR] Persistence path is not writable`  
+  `Recommendation: Check filesystem permissions and Docker volume mapping`
+- `[LOW_DISK_SPACE] Available disk space is low (<50MB)`  
+  `Recommendation: Clean up old snapshots or increase storage`
+- `WARNING: Persistence path may not be mounted to host`  
+  `Recommendation: Verify docker-compose volume mapping`
 
 ## Docker volume mapping
 
