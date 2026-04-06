@@ -5,6 +5,7 @@ import logging
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from app.exceptions import MikroTrackError
 
@@ -108,7 +109,102 @@ def _cleanup_old_snapshots() -> int:
     return removed_count
 
 
+def _latest_snapshot_path() -> Path | None:
+    snapshots = sorted(_persistence_path.glob("*.json"))
+    if not snapshots:
+        return None
+
+    return snapshots[-1]
+
+
+def _index_devices_by_mac(devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    indexed: dict[str, dict[str, Any]] = {}
+    for device in devices:
+        mac = str(device.get("mac_address", "")).strip()
+        if mac:
+            indexed[mac] = device
+    return indexed
+
+
+def _log_device_diff(previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]) -> None:
+    previous_by_mac = _index_devices_by_mac(previous_devices)
+    current_by_mac = _index_devices_by_mac(current_devices)
+
+    new_count = 0
+    removed_count = 0
+    changed_count = 0
+
+    for mac, current in current_by_mac.items():
+        previous = previous_by_mac.get(mac)
+        if previous is None:
+            new_count += 1
+            logger.debug(
+                "[NEW_DEVICE] New device detected: %s (%s)",
+                current.get("ip_address", ""),
+                mac,
+            )
+            continue
+
+        previous_ip = str(previous.get("ip_address", ""))
+        current_ip = str(current.get("ip_address", ""))
+        if previous_ip != current_ip:
+            changed_count += 1
+            logger.debug(
+                "[IP_CHANGED] Device IP changed: %s %s -> %s",
+                mac,
+                previous_ip,
+                current_ip,
+            )
+
+        previous_hostname = str(previous.get("host_name", ""))
+        current_hostname = str(current.get("host_name", ""))
+        if previous_hostname != current_hostname:
+            changed_count += 1
+            logger.debug(
+                "[HOSTNAME_CHANGED] Hostname changed: %s %s -> %s",
+                mac,
+                previous_hostname,
+                current_hostname,
+            )
+
+    for mac, previous in previous_by_mac.items():
+        if mac in current_by_mac:
+            continue
+
+        removed_count += 1
+        logger.debug(
+            "[DEVICE_REMOVED] Device disappeared: %s (%s)",
+            previous.get("ip_address", ""),
+            mac,
+        )
+
+    logger.info("Diff summary:")
+    logger.info("- new: %d", new_count)
+    logger.info("- removed: %d", removed_count)
+    logger.info("- changed: %d", changed_count)
+
+
+def process_snapshot_diff(current_devices: list[dict[str, Any]]) -> None:
+    previous_snapshot_path = _latest_snapshot_path()
+    if previous_snapshot_path is None:
+        logger.info("[DIFF_SKIPPED] No previous snapshot found")
+        return
+
+    try:
+        with previous_snapshot_path.open("r", encoding="utf-8") as snapshot_file:
+            previous_devices = json.load(snapshot_file)
+        if not isinstance(previous_devices, list):
+            raise ValueError("Snapshot payload is not a list")
+
+        _log_device_diff(previous_devices, current_devices)
+    except Exception:
+        logger.error("[DIFF_ERROR] Failed to process snapshots")
+        logger.error("Recommendation: Verify snapshot format and integrity")
+
+
 def save_snapshot(devices: list[dict]) -> None:
+    process_snapshot_diff(devices)
+
     filename = f"{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.json"
     file_path = _persistence_path / filename
 
