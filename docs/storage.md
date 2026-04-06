@@ -74,33 +74,46 @@ chmod 755 /data/snapshots
 - `WARNING: Persistence path may not be mounted to host`  
   `Recommendation: Verify docker-compose volume mapping`
 
-## Snapshot diff (аналіз змін)
+## Event-driven diff (аналіз змін)
 
-Під час кожного нового збереження MikroTrack намагається порівняти поточний snapshot із попереднім файлом у `PERSISTENCE_PATH`.
+Під час кожного нового збереження MikroTrack порівнює поточний snapshot із попереднім у `PERSISTENCE_PATH` за ключем `mac_address` і формує події для кожної зміни стану пристрою.
 
 Якщо попереднього snapshot немає:
 
 - `[DIFF_SKIPPED] No previous snapshot found`
 
-Порівняння виконується за:
+### Типи подій (DEBUG)
 
-- `mac_address` (primary key)
-- `ip_address`
-- `host_name`
+- Presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- IP/identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
+- DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
+- ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
+- Source: `SOURCE_CHANGED`
+- Combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
-Події змін (DEBUG):
+### Формат події
 
-- `[NEW_DEVICE] New device detected: {ip} ({mac})`
-- `[DEVICE_REMOVED] Device disappeared: {ip} ({mac})`
-- `[IP_CHANGED] Device IP changed: {mac} {old_ip} -> {new_ip}`
-- `[HOSTNAME_CHANGED] Hostname changed: {mac} {old} -> {new}`
+```json
+{
+  "timestamp": "2026-04-06T21:17:55",
+  "event_type": "DHCP_DYNAMIC_CHANGED",
+  "mac": "AA:BB:CC:DD:EE:FF",
+  "old_value": true,
+  "new_value": false
+}
+```
 
-Підсумок змін (INFO):
+### Збереження подій
+
+Події записуються у `events.jsonl` в тій же директорії `PERSISTENCE_PATH`. Це підготовка до інтеграції web UI (таймлайн/історія змін).
+
+### Підсумок змін (INFO)
 
 - `Diff summary:`
 - `- new: X`
 - `- removed: X`
 - `- changed: X`
+- `- events: X`
 
 Помилки обробки diff:
 
@@ -194,33 +207,46 @@ Typical messages:
 - `WARNING: Persistence path may not be mounted to host`  
   `Recommendation: Verify docker-compose volume mapping`
 
-## Snapshot diff (change analysis)
+## Event-driven diff (change analysis)
 
-On every new save, MikroTrack attempts to compare the current snapshot with the latest previous file in `PERSISTENCE_PATH`.
+On every new save, MikroTrack compares the current snapshot with the latest previous file in `PERSISTENCE_PATH` keyed by `mac_address` and emits events for every state transition.
 
 If no previous snapshot exists:
 
 - `[DIFF_SKIPPED] No previous snapshot found`
 
-Comparison keys:
+### Event types (DEBUG)
 
-- `mac_address` (primary key)
-- `ip_address`
-- `host_name`
+- Presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- IP/identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
+- DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
+- ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
+- Source: `SOURCE_CHANGED`
+- Combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
-Change events (DEBUG):
+### Event format
 
-- `[NEW_DEVICE] New device detected: {ip} ({mac})`
-- `[DEVICE_REMOVED] Device disappeared: {ip} ({mac})`
-- `[IP_CHANGED] Device IP changed: {mac} {old_ip} -> {new_ip}`
-- `[HOSTNAME_CHANGED] Hostname changed: {mac} {old} -> {new}`
+```json
+{
+  "timestamp": "2026-04-06T21:17:55",
+  "event_type": "DHCP_DYNAMIC_CHANGED",
+  "mac": "AA:BB:CC:DD:EE:FF",
+  "old_value": true,
+  "new_value": false
+}
+```
 
-Diff summary (INFO):
+### Event persistence
+
+Events are appended to `events.jsonl` in the same `PERSISTENCE_PATH` directory, preparing data for a web UI timeline/history view.
+
+### Diff summary (INFO)
 
 - `Diff summary:`
 - `- new: X`
 - `- removed: X`
 - `- changed: X`
+- `- events: X`
 
 Diff error handling:
 
