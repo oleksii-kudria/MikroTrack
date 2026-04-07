@@ -204,6 +204,18 @@
         gap: 6px;
       }
 
+      .flags-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+      }
+
+      .flags-separator {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
       .badge-blue {
         background: #dbeafe;
         color: #1d4ed8;
@@ -532,48 +544,21 @@
         `<span class="badge ${cssClass}" title="${escapeHtml(tooltip || label)}">${escapeHtml(label)}</span>`;
 
       const buildFlagsBadges = (flags) => {
-        const items = [];
-        const source = String(flags.source || "").toLowerCase();
-        const isDhcpSource = source.includes("dhcp");
-        const isArpSource = source.includes("arp");
+        const dhcpFlag = String(flags.dhcp_flag || "S").toUpperCase();
+        const arpFlag = String(flags.arp_flag || "S").toUpperCase();
 
-        if (isDhcpSource) {
-          items.push(badge("DHCP", "badge-blue", "Source: dhcp"));
-        }
-        if (isArpSource) {
-          items.push(badge("ARP", "badge-purple", "Source: arp"));
-        }
+        const dhcpTooltip = dhcpFlag === "D" ? "DHCP D = DHCP dynamic" : "DHCP S = DHCP static";
 
-        const assignment = String(flags.ip_assignment || "").toLowerCase();
-        if (assignment === "dynamic") {
-          items.push(badge("D", "badge-yellow", "Lease: dynamic"));
-        } else if (assignment === "static") {
-          items.push(badge("S", "badge-blue", "Lease: static"));
-        }
+        const arpTooltipMap = {
+          D: "ARP D = ARP dynamic",
+          C: "ARP C = ARP complete",
+          DC: "ARP DC = ARP dynamic + complete",
+          SC: "ARP SC = ARP static + complete",
+          S: "ARP S = ARP static",
+        };
+        const arpTooltip = arpTooltipMap[arpFlag] || `ARP ${arpFlag}`;
 
-        const dhcpStatus = String(flags.dhcp_status || "unknown").toLowerCase();
-        if (dhcpStatus === "bound") {
-          items.push(badge("B", "badge-green", "DHCP status: bound"));
-        } else {
-          items.push(badge("U", "badge-gray", `DHCP status: ${dhcpStatus || "unknown"}`));
-        }
-
-        const arpFlags = String(flags.arp_flags || "").toLowerCase();
-        const hasArpDynamic = arpFlags.includes("dynamic");
-        const hasArpComplete = arpFlags.includes("complete");
-        if (hasArpDynamic && hasArpComplete) {
-          items.push(badge("AD+C", "badge-orange", "ARP flags: dynamic + complete"));
-        } else if (hasArpDynamic) {
-          items.push(badge("AD", "badge-orange", "ARP flags: dynamic"));
-        } else if (hasArpComplete) {
-          items.push(badge("C", "badge-gray", "ARP flags: complete"));
-        }
-
-        if (!items.length) {
-          items.push(badge("-", "badge-gray", "No flags"));
-        }
-
-        return `<div class="badge-wrap">${items.join("")}</div>`;
+        return `<div class="flags-inline">${badge(dhcpFlag, "badge-blue", dhcpTooltip)}<span class="flags-separator">|</span>${badge(arpFlag, "badge-purple", arpTooltip)}</div>`;
       };
 
       const buildCommentBadges = (item) => {

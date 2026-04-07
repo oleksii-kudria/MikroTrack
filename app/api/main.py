@@ -123,6 +123,17 @@ def _is_active(device: dict[str, Any]) -> bool:
     return arp_status in {"reachable", "stale"}
 
 
+def _dhcp_flag(dhcp_flags: dict[str, Any]) -> str:
+    return "D" if bool(dhcp_flags.get("dynamic")) else "S"
+
+
+def _arp_flag(arp_flags: dict[str, Any]) -> str:
+    base_flag = "D" if bool(arp_flags.get("dynamic")) else "S"
+    if bool(arp_flags.get("complete")):
+        return f"{base_flag}C"
+    return base_flag
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -207,7 +218,8 @@ def list_devices() -> dict[str, object]:
 
         dhcp_flags = device.get("dhcp_flags") if isinstance(device.get("dhcp_flags"), dict) else {}
         arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
-        arp_flag_list = [key for key, value in arp_flags.items() if bool(value)]
+        dhcp_flag = _dhcp_flag(dhcp_flags)
+        arp_flag = _arp_flag(arp_flags)
         active = _is_active(device)
 
         items.append(
@@ -227,9 +239,8 @@ def list_devices() -> dict[str, object]:
                 ),
                 "flags": {
                     "source": source_text,
-                    "ip_assignment": "dynamic" if bool(dhcp_flags.get("dynamic")) else "static",
-                    "dhcp_status": str(device.get("dhcp_status", "unknown")),
-                    "arp_flags": ", ".join(arp_flag_list) if arp_flag_list else "-",
+                    "dhcp_flag": dhcp_flag,
+                    "arp_flag": arp_flag,
                     "state": "active" if active else "inactive",
                 },
                 "active": active,
