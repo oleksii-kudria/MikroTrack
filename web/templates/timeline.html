@@ -245,6 +245,10 @@
         background: #ffedd5;
         color: #c2410c;
       }
+      .badge-red {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
 
       .badge-comment {
         max-width: 380px;
@@ -610,6 +614,25 @@
         return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
       };
 
+      const buildIpCell = (item) => {
+        const ipText = String(item.ip || "").trim() || "-";
+        const parts = [`<span>${escapeHtml(ipText)}</span>`];
+        if (Boolean(item.is_link_local_ip)) {
+          parts.push(badge("LINK-LOCAL", "badge-orange", "APIPA / link-local IP address"));
+        }
+
+        const secondaryCount = Number(item.arp_secondary_count || 0);
+        if (secondaryCount > 0) {
+          const secondary = Array.isArray(item.arp_secondary) ? item.arp_secondary : [];
+          const summary = secondary
+            .map((entry) => `${entry.ip_address || "?"} (${entry.status || "unknown"})`)
+            .join("\n");
+          parts.push(badge(`+${secondaryCount} ARP`, "badge-red", summary || "Additional ARP records"));
+        }
+
+        return `<div class="badge-wrap">${parts.join("")}</div>`;
+      };
+
       const renderDevices = (items) => {
         if (!items.length) {
           devicesTable.innerHTML = '<tr><td class="empty" colspan="6">No devices found</td></tr>';
@@ -622,7 +645,7 @@
             return `
               <tr>
                 <td>${buildStatusMac(item)}</td>
-                <td>${item.ip || "-"}</td>
+                <td>${buildIpCell(item)}</td>
                 <td>${item.hostname || "-"}</td>
                 <td>${buildCommentBadges(item)}</td>
                 <td>${buildFlagsBadges(flags)}</td>
