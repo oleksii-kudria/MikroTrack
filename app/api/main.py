@@ -109,18 +109,35 @@ def _comment_badge_label(dhcp_comment: str, arp_comment: str) -> str:
     return "-"
 
 
-def _is_active(device: dict[str, Any]) -> bool:
-    dhcp_status = str(device.get("dhcp_status", "")).lower()
-    arp_status = str(device.get("arp_status", "")).lower()
+_ONLINE_ARP_STATUSES = {
+    "reachable",
+    "stale",
+    "delay",
+    "probe",
+    "complete",
+}
+
+
+def _device_state(device: dict[str, Any]) -> str:
+    arp_status_raw = str(device.get("arp_status", "")).strip().lower()
     arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
+    dhcp_status = str(device.get("dhcp_status", "")).strip().lower()
 
     if bool(arp_flags.get("disabled")) or bool(arp_flags.get("invalid")):
-        return False
+        return "offline"
 
+    if arp_status_raw:
+        if arp_status_raw == "failed":
+            return "offline"
+        if arp_status_raw in _ONLINE_ARP_STATUSES:
+            return "online"
+        return "unknown"
+
+    # Fallback path when ARP status is absent in historical/legacy snapshots.
     if dhcp_status == "bound":
-        return True
+        return "unknown"
 
-    return arp_status in {"reachable", "stale"}
+    return "offline"
 
 
 def _dhcp_flag(dhcp_flags: dict[str, Any]) -> str:
@@ -220,7 +237,9 @@ def list_devices() -> dict[str, object]:
         arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
         dhcp_flag = _dhcp_flag(dhcp_flags)
         arp_flag = _arp_flag(arp_flags)
-        active = _is_active(device)
+        device_state = _device_state(device)
+        active = device_state == "online"
+        arp_status = str(device.get("arp_status", "unknown"))
 
         items.append(
             {
@@ -241,8 +260,10 @@ def list_devices() -> dict[str, object]:
                     "source": source_text,
                     "dhcp_flag": dhcp_flag,
                     "arp_flag": arp_flag,
-                    "state": "active" if active else "inactive",
+                    "state": device_state,
                 },
+                "status": device_state,
+                "arp_status": arp_status,
                 "active": active,
                 "last_change": last_change.isoformat(),
                 "elapsed_seconds": elapsed_seconds,

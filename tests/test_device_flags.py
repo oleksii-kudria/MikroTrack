@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.api.main import _arp_flag, _dhcp_flag
+from app.api.main import _arp_flag, _device_state, _dhcp_flag
 from app.collector import get_arp_entries, get_dhcp_leases
 
 
@@ -34,6 +34,25 @@ class DeviceFlagRenderingTests(unittest.TestCase):
         self.assertEqual(_arp_flag({"dynamic": False, "complete": True}), "SC")
         self.assertEqual(_arp_flag({"dynamic": False, "complete": False}), "S")
         self.assertEqual(_arp_flag({"complete": True}), "SC")
+
+    def test_device_state_uses_arp_status_as_source_of_truth(self) -> None:
+        self.assertEqual(_device_state({"arp_status": "failed"}), "offline")
+        self.assertEqual(_device_state({"arp_status": "reachable"}), "online")
+        self.assertEqual(_device_state({"arp_status": "probe"}), "online")
+
+    def test_device_state_fallback_for_missing_arp_status(self) -> None:
+        self.assertEqual(_device_state({"dhcp_status": "bound"}), "unknown")
+        self.assertEqual(_device_state({}), "offline")
+
+    def test_device_state_handles_invalid_or_disabled_entries(self) -> None:
+        self.assertEqual(
+            _device_state({"arp_status": "reachable", "arp_flags": {"invalid": True}}),
+            "offline",
+        )
+        self.assertEqual(
+            _device_state({"arp_status": "reachable", "arp_flags": {"disabled": True}}),
+            "offline",
+        )
 
 
 class MikroTikCollectorFlagParsingTests(unittest.TestCase):
