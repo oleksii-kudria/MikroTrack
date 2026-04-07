@@ -149,7 +149,10 @@ def _dhcp_flag(has_dhcp_lease: bool, dhcp_flags: dict[str, Any], dhcp_is_dynamic
     return "D" if bool(dhcp_flags.get("dynamic")) else "S"
 
 
-def _arp_flag(arp_flags: dict[str, Any]) -> str:
+def _arp_flag(has_arp_entry: bool, arp_flags: dict[str, Any]) -> str | None:
+    if not has_arp_entry:
+        return None
+
     base_flag = "D" if bool(arp_flags.get("dynamic")) else "S"
     if bool(arp_flags.get("complete")):
         return f"{base_flag}C"
@@ -249,8 +252,13 @@ def list_devices() -> dict[str, object]:
 
         raw_dhcp_is_dynamic = device.get("dhcp_is_dynamic")
         dhcp_is_dynamic = raw_dhcp_is_dynamic if isinstance(raw_dhcp_is_dynamic, bool) else None
+        raw_has_arp_entry = device.get("has_arp_entry")
+        if isinstance(raw_has_arp_entry, bool):
+            has_arp_entry = raw_has_arp_entry
+        else:
+            has_arp_entry = "arp" in source_tokens
         dhcp_flag = _dhcp_flag(has_dhcp_lease, dhcp_flags, dhcp_is_dynamic)
-        arp_flag = _arp_flag(arp_flags)
+        arp_flag = _arp_flag(has_arp_entry, arp_flags)
         device_state = _device_state(device)
         active = device_state == "online"
         arp_status = str(device.get("arp_status", "unknown"))
@@ -274,6 +282,7 @@ def list_devices() -> dict[str, object]:
                     "source": source_text,
                     "dhcp_flag": dhcp_flag,
                     "has_dhcp_lease": has_dhcp_lease,
+                    "has_arp_entry": has_arp_entry,
                     "arp_flag": arp_flag,
                     "state": device_state,
                 },

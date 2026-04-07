@@ -95,6 +95,7 @@ def get_arp_entries(client: MikroTikClient) -> list[dict[str, Any]]:
                 "disabled": entry.get("disabled", "false") == "true",
                 "invalid": entry.get("invalid", "false") == "true",
                 "published": entry.get("published", "false") == "true",
+                "has_arp_entry": True,
             }
         )
 

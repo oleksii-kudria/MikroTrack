@@ -36,6 +36,7 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
                 "invalid": False,
                 "published": False,
             },
+            "has_arp_entry": False,
             "created_by": "dhcp",
             "arp_type": "unknown",
             "source": ["dhcp"],
@@ -71,6 +72,7 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
                     "invalid": entry.get("invalid", False),
                     "published": entry.get("published", False),
                 },
+                "has_arp_entry": bool(entry.get("has_arp_entry", True)),
                 "created_by": "manual",
                 "arp_type": "dynamic" if entry.get("dynamic", False) else "static",
                 "source": ["arp"],
@@ -102,6 +104,7 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
             "invalid": entry.get("invalid", False),
             "published": entry.get("published", False),
         }
+        existing["has_arp_entry"] = bool(entry.get("has_arp_entry", True))
         existing["arp_type"] = "dynamic" if entry.get("dynamic", False) else "static"
         if existing["created_by"] != "dhcp":
             existing["created_by"] = "manual"
