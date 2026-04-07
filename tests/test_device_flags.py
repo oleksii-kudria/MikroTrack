@@ -40,7 +40,8 @@ class DeviceFlagRenderingTests(unittest.TestCase):
     def test_device_state_uses_arp_status_as_source_of_truth(self) -> None:
         self.assertEqual(_device_state({"arp_status": "failed"}), "offline")
         self.assertEqual(_device_state({"arp_status": "reachable"}), "online")
-        self.assertEqual(_device_state({"arp_status": "probe"}), "online")
+        self.assertEqual(_device_state({"arp_status": "probe"}), "unknown")
+        self.assertEqual(_device_state({"arp_status": "stale"}), "unknown")
 
     def test_device_state_fallback_for_missing_arp_status(self) -> None:
         self.assertEqual(_device_state({"dhcp_status": "bound"}), "unknown")
@@ -130,6 +131,55 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
 
         self.assertEqual(len(devices), 1)
         self.assertFalse(devices[0]["has_arp_entry"])
+
+    def test_builder_keeps_non_link_local_dhcp_as_primary(self) -> None:
+        devices = build_devices(
+            dhcp=[
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.10",
+                    "status": "bound",
+                    "dynamic": True,
+                }
+            ],
+            arp=[
+                {
+                    "mac_address": "AA",
+                    "ip_address": "169.254.10.5",
+                    "status": "reachable",
+                    "dynamic": True,
+                    "complete": True,
+                }
+            ],
+        )
+
+        self.assertEqual(devices[0]["ip_address"], "192.168.88.10")
+
+    def test_builder_prefers_non_failed_non_link_local_arp(self) -> None:
+        devices = build_devices(
+            dhcp=[],
+            arp=[
+                {"mac_address": "AA", "ip_address": "169.254.10.5", "status": "reachable", "dynamic": True},
+                {"mac_address": "AA", "ip_address": "192.168.88.11", "status": "stale", "dynamic": True},
+                {"mac_address": "AA", "ip_address": "192.168.88.12", "status": "failed", "dynamic": True},
+            ],
+        )
+
+        self.assertEqual(devices[0]["ip_address"], "192.168.88.11")
+        self.assertEqual(devices[0]["arp_status"], "stale")
+        self.assertEqual(len(devices[0]["arp_secondary"]), 2)
+
+    def test_builder_does_not_use_failed_arp_as_primary_ip(self) -> None:
+        devices = build_devices(
+            dhcp=[],
+            arp=[
+                {"mac_address": "AA", "ip_address": "192.168.88.12", "status": "failed", "dynamic": True},
+                {"mac_address": "AA", "ip_address": "169.254.10.5", "status": "failed", "dynamic": True},
+            ],
+        )
+
+        self.assertEqual(devices[0]["ip_address"], "")
+        self.assertEqual(devices[0]["arp_status"], "failed")
 
 
 if __name__ == "__main__":

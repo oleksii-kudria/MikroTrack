@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any
 
@@ -109,13 +110,18 @@ def _comment_badge_label(dhcp_comment: str, arp_comment: str) -> str:
     return "-"
 
 
-_ONLINE_ARP_STATUSES = {
-    "reachable",
-    "stale",
-    "delay",
-    "probe",
-    "complete",
-}
+_ONLINE_ARP_STATUSES = {"reachable", "complete"}
+_UNKNOWN_ARP_STATUSES = {"stale", "delay", "probe"}
+
+
+def _is_link_local(ip_raw: str) -> bool:
+    ip_text = str(ip_raw or "").strip()
+    if not ip_text:
+        return False
+    try:
+        return ip_address(ip_text).is_link_local
+    except ValueError:
+        return False
 
 
 def _device_state(device: dict[str, Any]) -> str:
@@ -131,6 +137,8 @@ def _device_state(device: dict[str, Any]) -> str:
             return "offline"
         if arp_status_raw in _ONLINE_ARP_STATUSES:
             return "online"
+        if arp_status_raw in _UNKNOWN_ARP_STATUSES:
+            return "unknown"
         return "unknown"
 
     # Fallback path when ARP status is absent in historical/legacy snapshots.
@@ -262,11 +270,14 @@ def list_devices() -> dict[str, object]:
         device_state = _device_state(device)
         active = device_state == "online"
         arp_status = str(device.get("arp_status", "unknown"))
+        primary_ip = str(device.get("ip_address", ""))
+        arp_secondary = device.get("arp_secondary") if isinstance(device.get("arp_secondary"), list) else []
 
         items.append(
             {
                 "mac": mac,
-                "ip": device.get("ip_address", ""),
+                "ip": primary_ip,
+                "is_link_local_ip": _is_link_local(primary_ip),
                 "hostname": device.get("host_name", ""),
                 "dhcp_comment": str(device.get("dhcp_comment", "")),
                 "arp_comment": str(device.get("arp_comment", "")),
@@ -288,6 +299,8 @@ def list_devices() -> dict[str, object]:
                 },
                 "status": device_state,
                 "arp_status": arp_status,
+                "arp_secondary_count": len(arp_secondary),
+                "arp_secondary": arp_secondary,
                 "active": active,
                 "last_change": last_change.isoformat(),
                 "elapsed_seconds": elapsed_seconds,
