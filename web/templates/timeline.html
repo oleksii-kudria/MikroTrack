@@ -549,9 +549,11 @@
 
       const buildFlagsBadges = (flags) => {
         const hasDhcpLease = Boolean(flags.has_dhcp_lease);
+        const hasArpEntry = Boolean(flags.has_arp_entry);
         const dhcpFlagRaw = flags.dhcp_flag;
         const dhcpFlag = dhcpFlagRaw ? String(dhcpFlagRaw).toUpperCase() : "";
-        const arpFlag = String(flags.arp_flag || "S").toUpperCase();
+        const arpFlagRaw = flags.arp_flag;
+        const arpFlag = arpFlagRaw ? String(arpFlagRaw).toUpperCase() : "";
 
         const dhcpTooltip = dhcpFlag === "D" ? "DHCP D = DHCP dynamic" : "DHCP S = DHCP static";
 
@@ -563,6 +565,13 @@
           S: "ARP S = ARP static",
         };
         const arpTooltip = arpTooltipMap[arpFlag] || `ARP ${arpFlag}`;
+
+        if (!hasArpEntry || !arpFlag) {
+          if (!hasDhcpLease || !dhcpFlag) {
+            return `<div class="flags-inline"><span class="badge badge-gray" title="No DHCP/ARP assignment flags">-</span></div>`;
+          }
+          return `<div class="flags-inline">${badge(dhcpFlag, "badge-blue", dhcpTooltip)}</div>`;
+        }
 
         if (!hasDhcpLease || !dhcpFlag) {
           return `<div class="flags-inline">${badge(arpFlag, "badge-purple", arpTooltip)}</div>`;

@@ -30,11 +30,12 @@ class DeviceFlagRenderingTests(unittest.TestCase):
         self.assertIsNone(_dhcp_flag(False, {}))
 
     def test_arp_flag_matrix(self) -> None:
-        self.assertEqual(_arp_flag({"dynamic": True, "complete": True}), "DC")
-        self.assertEqual(_arp_flag({"dynamic": True, "complete": False}), "D")
-        self.assertEqual(_arp_flag({"dynamic": False, "complete": True}), "SC")
-        self.assertEqual(_arp_flag({"dynamic": False, "complete": False}), "S")
-        self.assertEqual(_arp_flag({"complete": True}), "SC")
+        self.assertEqual(_arp_flag(True, {"dynamic": True, "complete": True}), "DC")
+        self.assertEqual(_arp_flag(True, {"dynamic": True, "complete": False}), "D")
+        self.assertEqual(_arp_flag(True, {"dynamic": False, "complete": True}), "SC")
+        self.assertEqual(_arp_flag(True, {"dynamic": False, "complete": False}), "S")
+        self.assertEqual(_arp_flag(True, {"complete": True}), "SC")
+        self.assertIsNone(_arp_flag(False, {"dynamic": False, "complete": False}))
 
     def test_device_state_uses_arp_status_as_source_of_truth(self) -> None:
         self.assertEqual(_device_state({"arp_status": "failed"}), "offline")
@@ -91,6 +92,7 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertTrue(arp_entries[0]["complete"])
         self.assertFalse(arp_entries[1]["dynamic"])
         self.assertFalse(arp_entries[1]["complete"])
+        self.assertTrue(arp_entries[0]["has_arp_entry"])
 
     def test_builder_does_not_fake_dhcp_for_arp_only_device(self) -> None:
         devices = build_devices(
@@ -110,6 +112,24 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertFalse(devices[0]["has_dhcp_lease"])
         self.assertIsNone(devices[0]["dhcp_is_dynamic"])
         self.assertEqual(devices[0]["dhcp_flags"], {})
+        self.assertTrue(devices[0]["has_arp_entry"])
+
+    def test_builder_marks_no_arp_for_dhcp_only_device(self) -> None:
+        devices = build_devices(
+            dhcp=[
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.10",
+                    "status": "bound",
+                    "dynamic": False,
+                    "has_dhcp_lease": True,
+                }
+            ],
+            arp=[],
+        )
+
+        self.assertEqual(len(devices), 1)
+        self.assertFalse(devices[0]["has_arp_entry"])
 
 
 if __name__ == "__main__":
