@@ -279,6 +279,14 @@
         background: #6b7280;
       }
 
+      .status-idle {
+        background: #ca8a04;
+      }
+
+      .status-permanent {
+        background: #4b5563;
+      }
+
       .changes {
         margin: 0;
         padding-left: 18px;
@@ -607,11 +615,22 @@
 
       const buildStatusMac = (item) => {
         const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
-        const state = ["online", "offline", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
-        const cls = state === "online" ? "status-active" : state === "offline" ? "status-inactive" : "status-unknown";
+        const state = ["online", "offline", "idle", "permanent", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+        const cls = state === "online"
+          ? "status-active"
+          : state === "offline"
+            ? "status-inactive"
+            : state === "idle"
+              ? "status-idle"
+              : state === "permanent"
+                ? "status-permanent"
+                : "status-unknown";
         const rawArpStatus = String(item.arp_status || "").trim();
         const tooltip = rawArpStatus ? `${state} (arp status: ${rawArpStatus})` : state;
-        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
+        const permanentBadge = state === "permanent"
+          ? `<span class="badge badge-gray" title="Static ARP entry">PERM</span>`
+          : "";
+        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code>${permanentBadge}</span>`;
       };
 
       const buildIpCell = (item) => {

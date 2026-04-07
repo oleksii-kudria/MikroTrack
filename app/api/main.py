@@ -9,6 +9,8 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from app.arp_logic import arp_state_from_status, normalize_arp_status
+
 app = FastAPI(title="MikroTrack API", version="0.1.0")
 
 
@@ -110,10 +112,6 @@ def _comment_badge_label(dhcp_comment: str, arp_comment: str) -> str:
     return "-"
 
 
-_ONLINE_ARP_STATUSES = {"reachable", "complete"}
-_UNKNOWN_ARP_STATUSES = {"stale", "delay", "probe"}
-
-
 def _is_link_local(ip_raw: str) -> bool:
     ip_text = str(ip_raw or "").strip()
     if not ip_text:
@@ -125,21 +123,15 @@ def _is_link_local(ip_raw: str) -> bool:
 
 
 def _device_state(device: dict[str, Any]) -> str:
-    arp_status_raw = str(device.get("arp_status", "")).strip().lower()
+    arp_status_raw = normalize_arp_status(device.get("arp_status", ""))
     arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
     dhcp_status = str(device.get("dhcp_status", "")).strip().lower()
 
     if bool(arp_flags.get("disabled")) or bool(arp_flags.get("invalid")):
         return "offline"
 
-    if arp_status_raw:
-        if arp_status_raw == "failed":
-            return "offline"
-        if arp_status_raw in _ONLINE_ARP_STATUSES:
-            return "online"
-        if arp_status_raw in _UNKNOWN_ARP_STATUSES:
-            return "unknown"
-        return "unknown"
+    if arp_status_raw and arp_status_raw != "unknown":
+        return arp_state_from_status(arp_status_raw)
 
     # Fallback path when ARP status is absent in historical/legacy snapshots.
     if dhcp_status == "bound":
@@ -269,7 +261,8 @@ def list_devices() -> dict[str, object]:
         arp_flag = _arp_flag(has_arp_entry, arp_flags)
         device_state = _device_state(device)
         active = device_state == "online"
-        arp_status = str(device.get("arp_status", "unknown"))
+        arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
+        arp_state = str(device.get("arp_state", "")).strip().lower() or device_state
         primary_ip = str(device.get("ip_address", ""))
         arp_secondary = device.get("arp_secondary") if isinstance(device.get("arp_secondary"), list) else []
 
@@ -299,6 +292,7 @@ def list_devices() -> dict[str, object]:
                 },
                 "status": device_state,
                 "arp_status": arp_status,
+                "arp_state": arp_state,
                 "arp_secondary_count": len(arp_secondary),
                 "arp_secondary": arp_secondary,
                 "active": active,

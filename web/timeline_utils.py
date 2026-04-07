@@ -37,6 +37,8 @@ def readable_description(event: dict[str, object]) -> str:
         ),
         "IP_CHANGED": f"IP changed from {old_value or 'unknown'} to {new_value or 'unknown'}",
         "SOURCE_CHANGED": f"Source changed from {old_value or 'unknown'} to {new_value or 'unknown'}",
+        "ARP_STATUS_CHANGED": f"ARP status changed from {old_value or 'unknown'} to {new_value or 'unknown'}",
+        "ARP_STATE_CHANGED": f"ARP state changed from {old_value or 'unknown'} to {new_value or 'unknown'}",
     }
     if event_type in descriptions:
         return descriptions[event_type]

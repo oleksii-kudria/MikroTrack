@@ -4,6 +4,8 @@ import logging
 from ipaddress import ip_address
 from typing import Any
 
+from app.arp_logic import arp_state_from_status, normalize_arp_status
+
 logger = logging.getLogger("mikrotrack.device_builder")
 
 _ARP_STATUS_PRIORITY = {
@@ -27,14 +29,14 @@ def _is_link_local(ip_raw: str) -> bool:
 
 
 def _arp_priority(entry: dict[str, Any]) -> tuple[int, int]:
-    status = str(entry.get("status", "unknown")).strip().lower()
+    status = normalize_arp_status(entry.get("status", "unknown"))
     status_priority = _ARP_STATUS_PRIORITY.get(status, 2)
     link_local_priority = 1 if _is_link_local(str(entry.get("ip_address", ""))) else 0
     return status_priority, link_local_priority
 
 
 def _select_primary_arp(arp_records: list[dict[str, Any]]) -> dict[str, Any] | None:
-    candidates = [record for record in arp_records if str(record.get("status", "")).strip().lower() != "failed"]
+    candidates = [record for record in arp_records if normalize_arp_status(record.get("status", "")) != "failed"]
     if not candidates:
         return None
     by_status = sorted(candidates, key=lambda entry: _ARP_STATUS_PRIORITY.get(str(entry.get("status", "")).strip().lower(), 2))
@@ -61,6 +63,7 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
             "arp_comment": "",
             "dhcp_status": lease.get("status", "unknown"),
             "arp_status": "unknown",
+            "arp_state": "unknown",
             "dhcp_flags": {
                 "dynamic": lease.get("dynamic", False),
             },
@@ -101,6 +104,8 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
 
         entry = display_arp
         mac_address = entry.get("mac_address", "")
+        arp_status = normalize_arp_status(entry.get("status", "unknown"))
+        arp_state = arp_state_from_status(arp_status)
 
         arp_ip = primary_arp.get("ip_address", "") if primary_arp is not None else ""
         existing = devices_by_mac.get(mac_address)
@@ -113,7 +118,8 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
                 "dhcp_comment": "",
                 "arp_comment": entry.get("comment", ""),
                 "dhcp_status": "unknown",
-                "arp_status": entry.get("status", "unknown"),
+                "arp_status": arp_status,
+                "arp_state": arp_state,
                 "dhcp_flags": {},
                 "has_dhcp_lease": False,
                 "dhcp_is_dynamic": None,
@@ -141,7 +147,8 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
         logger.debug("merge steps: MAC=%s merged with ARP", mac_address)
 
         existing["arp_comment"] = entry.get("comment", "")
-        existing["arp_status"] = entry.get("status", "unknown")
+        existing["arp_status"] = arp_status
+        existing["arp_state"] = arp_state
         existing["arp_flags"] = {
             "dynamic": entry.get("dynamic", False),
             "dhcp": entry.get("dhcp", False),

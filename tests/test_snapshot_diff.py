@@ -179,6 +179,42 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIn("Recommendation: Verify snapshot format and integrity", output)
         self.assertEqual(events, [])
 
+    def test_diff_generates_arp_status_and_state_change_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:12",
+                            "ip_address": "192.168.88.70",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+
+            events = process_snapshot_diff(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:12",
+                        "ip_address": "192.168.88.70",
+                        "source": ["arp"],
+                        "arp_status": "permanent",
+                        "arp_state": "permanent",
+                    }
+                ]
+            )
+
+        by_type = {event["event_type"]: event for event in events}
+        self.assertEqual(by_type["arp_status_changed"]["old_status"], "reachable")
+        self.assertEqual(by_type["arp_status_changed"]["new_status"], "permanent")
+        self.assertEqual(by_type["arp_state_changed"]["old_state"], "online")
+        self.assertEqual(by_type["arp_state_changed"]["new_state"], "permanent")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

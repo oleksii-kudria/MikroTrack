@@ -40,8 +40,9 @@ class DeviceFlagRenderingTests(unittest.TestCase):
     def test_device_state_uses_arp_status_as_source_of_truth(self) -> None:
         self.assertEqual(_device_state({"arp_status": "failed"}), "offline")
         self.assertEqual(_device_state({"arp_status": "reachable"}), "online")
-        self.assertEqual(_device_state({"arp_status": "probe"}), "unknown")
-        self.assertEqual(_device_state({"arp_status": "stale"}), "unknown")
+        self.assertEqual(_device_state({"arp_status": "probe"}), "idle")
+        self.assertEqual(_device_state({"arp_status": "stale"}), "idle")
+        self.assertEqual(_device_state({"arp_status": "permanent"}), "permanent")
 
     def test_device_state_fallback_for_missing_arp_status(self) -> None:
         self.assertEqual(_device_state({"dhcp_status": "bound"}), "unknown")
@@ -180,6 +181,17 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
 
         self.assertEqual(devices[0]["ip_address"], "")
         self.assertEqual(devices[0]["arp_status"], "failed")
+
+    def test_builder_exposes_arp_state_for_permanent_records(self) -> None:
+        devices = build_devices(
+            dhcp=[],
+            arp=[
+                {"mac_address": "AA", "ip_address": "192.168.88.12", "status": "permanent", "dynamic": False},
+            ],
+        )
+
+        self.assertEqual(devices[0]["arp_status"], "permanent")
+        self.assertEqual(devices[0]["arp_state"], "permanent")
 
 
 if __name__ == "__main__":
