@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from app.arp_logic import arp_state_from_status, normalize_arp_status
 from app.exceptions import MikroTrackError
 
 logger = logging.getLogger("mikrotrack")
@@ -177,6 +178,27 @@ def _log_event(event: Event) -> None:
 
     suffix = f" ({', '.join(details)})" if details else ""
     logger.debug("[%s] Event generated for %s%s", event["event_type"], event["mac"], suffix)
+
+
+def _build_arp_transition_event(
+    event_type: str,
+    mac: str,
+    *,
+    old_key: str,
+    new_key: str,
+    old_value: str,
+    new_value: str,
+) -> Event:
+    return {
+        "timestamp": _iso_timestamp(),
+        "event_type": event_type,
+        "type": event_type,
+        "mac": mac,
+        old_key: old_value,
+        new_key: new_value,
+        "old_value": old_value,
+        "new_value": new_value,
+    }
 
 
 def _append_events(events: list[Event]) -> None:
@@ -358,6 +380,38 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                 mac,
                 old_value=previous_arp_flags,
                 new_value=current_arp_flags,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_arp_status = normalize_arp_status(previous.get("arp_status", "unknown"))
+        current_arp_status = normalize_arp_status(current.get("arp_status", "unknown"))
+        if previous_arp_status != current_arp_status:
+            changed_count += 1
+            logger.debug("[arp_status_changed] ARP status changed: %s -> %s", previous_arp_status, current_arp_status)
+            event = _build_arp_transition_event(
+                "arp_status_changed",
+                mac,
+                old_key="old_status",
+                new_key="new_status",
+                old_value=previous_arp_status,
+                new_value=current_arp_status,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_arp_state = str(previous.get("arp_state", "")).strip().lower() or arp_state_from_status(previous_arp_status)
+        current_arp_state = str(current.get("arp_state", "")).strip().lower() or arp_state_from_status(current_arp_status)
+        if previous_arp_state != current_arp_state:
+            changed_count += 1
+            logger.debug("[arp_state_changed] ARP state changed: %s -> %s", previous_arp_state, current_arp_state)
+            event = _build_arp_transition_event(
+                "arp_state_changed",
+                mac,
+                old_key="old_state",
+                new_key="new_state",
+                old_value=previous_arp_state,
+                new_value=current_arp_state,
             )
             events.append(event)
             _log_event(event)

@@ -35,6 +35,25 @@ class TimelineFormattingTests(unittest.TestCase):
         self.assertEqual(ip_description, "IP changed from 192.168.88.10 to 192.168.88.11")
         self.assertEqual(source_description, "Source changed from dhcp to arp")
 
+    def test_readable_description_for_arp_status_and_state_changes(self) -> None:
+        status_description = readable_description(
+            {
+                "event_type": "arp_status_changed",
+                "old_value": "reachable",
+                "new_value": "permanent",
+            }
+        )
+        state_description = readable_description(
+            {
+                "event_type": "arp_state_changed",
+                "old_value": "online",
+                "new_value": "permanent",
+            }
+        )
+
+        self.assertEqual(status_description, "ARP status changed from reachable to permanent")
+        self.assertEqual(state_description, "ARP state changed from online to permanent")
+
     def test_groups_events_by_mac_and_timestamp_window(self) -> None:
         events = [
             {"timestamp": "2026-04-06T10:00:00", "event_type": "IP_CHANGED", "mac": "AA:AA", "old_value": "1", "new_value": "2"},

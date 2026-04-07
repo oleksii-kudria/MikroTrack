@@ -22,6 +22,7 @@ MikroTrack читає ARP table з `/ip/arp/print` та нормалізує:
 - `mac-address` → `mac_address`
 - `interface` → `interface`
 - `status` → `arp_status`
+- `derived state` → `arp_state`
 - `dynamic`/router flags → `arp_flags`
 - `comment` → `arp_comment`
 
@@ -53,8 +54,21 @@ MikroTrack читає ARP table з `/ip/arp/print` та нормалізує:
 
 - `reachable`
 - `stale`
+- `delay`
+- `probe`
 - `failed`
 - `incomplete`
+- `permanent`
+
+### ARP derived state mapping
+
+- `reachable` → `online`
+- `stale` / `delay` / `probe` → `idle`
+- `failed` / `incomplete` → `offline`
+- `permanent` → `permanent` (static ARP entry type)
+- unknown values → `unknown`
+
+> `permanent` не трактуємо як `online` або `offline`.
 
 ## Приклад unified JSON
 
@@ -67,6 +81,7 @@ MikroTrack читає ARP table з `/ip/arp/print` та нормалізує:
     "source": "dhcp+arp",
     "dhcp_status": "bound",
     "arp_status": "reachable",
+    "arp_state": "online",
     "dhcp_flags": ["dynamic"],
     "arp_flags": ["dynamic", "complete"],
     "dhcp_comment": "Office host",
@@ -101,6 +116,7 @@ MikroTrack reads ARP table from `/ip/arp/print` and normalizes:
 - `mac-address` → `mac_address`
 - `interface` → `interface`
 - `status` → `arp_status`
+- `derived state` → `arp_state`
 - `dynamic`/router flags → `arp_flags`
 - `comment` → `arp_comment`
 
@@ -132,5 +148,18 @@ MikroTrack reads ARP table from `/ip/arp/print` and normalizes:
 
 - `reachable`
 - `stale`
+- `delay`
+- `probe`
 - `failed`
 - `incomplete`
+- `permanent`
+
+### ARP derived state mapping
+
+- `reachable` → `online`
+- `stale` / `delay` / `probe` → `idle`
+- `failed` / `incomplete` → `offline`
+- `permanent` → `permanent` (static ARP entry type)
+- unknown values → `unknown`
+
+> `permanent` must not be interpreted as `online` or `offline`.
