@@ -140,7 +140,12 @@ def _device_state(device: dict[str, Any]) -> str:
     return "offline"
 
 
-def _dhcp_flag(dhcp_flags: dict[str, Any]) -> str:
+def _dhcp_flag(has_dhcp_lease: bool, dhcp_flags: dict[str, Any], dhcp_is_dynamic: bool | None = None) -> str | None:
+    if not has_dhcp_lease:
+        return None
+
+    if dhcp_is_dynamic is not None:
+        return "D" if dhcp_is_dynamic else "S"
     return "D" if bool(dhcp_flags.get("dynamic")) else "S"
 
 
@@ -230,12 +235,21 @@ def list_devices() -> dict[str, object]:
         mac = str(device.get("mac_address", ""))
         last_change = last_change_by_mac.get(mac, snapshot_ts)
         elapsed_seconds = max(0, int((now - last_change).total_seconds()))
-        source = device.get("source")
-        source_text = "+".join(source) if isinstance(source, list) else str(source or "-")
-
         dhcp_flags = device.get("dhcp_flags") if isinstance(device.get("dhcp_flags"), dict) else {}
         arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
-        dhcp_flag = _dhcp_flag(dhcp_flags)
+        source = device.get("source")
+        source_text = "+".join(source) if isinstance(source, list) else str(source or "-")
+        source_tokens = set(source_text.split("+"))
+
+        raw_has_dhcp_lease = device.get("has_dhcp_lease")
+        if isinstance(raw_has_dhcp_lease, bool):
+            has_dhcp_lease = raw_has_dhcp_lease
+        else:
+            has_dhcp_lease = "dhcp" in source_tokens
+
+        raw_dhcp_is_dynamic = device.get("dhcp_is_dynamic")
+        dhcp_is_dynamic = raw_dhcp_is_dynamic if isinstance(raw_dhcp_is_dynamic, bool) else None
+        dhcp_flag = _dhcp_flag(has_dhcp_lease, dhcp_flags, dhcp_is_dynamic)
         arp_flag = _arp_flag(arp_flags)
         device_state = _device_state(device)
         active = device_state == "online"
@@ -259,6 +273,7 @@ def list_devices() -> dict[str, object]:
                 "flags": {
                     "source": source_text,
                     "dhcp_flag": dhcp_flag,
+                    "has_dhcp_lease": has_dhcp_lease,
                     "arp_flag": arp_flag,
                     "state": device_state,
                 },

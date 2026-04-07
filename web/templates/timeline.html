@@ -548,7 +548,9 @@
         `<span class="badge ${cssClass}" title="${escapeHtml(tooltip || label)}">${escapeHtml(label)}</span>`;
 
       const buildFlagsBadges = (flags) => {
-        const dhcpFlag = String(flags.dhcp_flag || "S").toUpperCase();
+        const hasDhcpLease = Boolean(flags.has_dhcp_lease);
+        const dhcpFlagRaw = flags.dhcp_flag;
+        const dhcpFlag = dhcpFlagRaw ? String(dhcpFlagRaw).toUpperCase() : "";
         const arpFlag = String(flags.arp_flag || "S").toUpperCase();
 
         const dhcpTooltip = dhcpFlag === "D" ? "DHCP D = DHCP dynamic" : "DHCP S = DHCP static";
@@ -561,6 +563,10 @@
           S: "ARP S = ARP static",
         };
         const arpTooltip = arpTooltipMap[arpFlag] || `ARP ${arpFlag}`;
+
+        if (!hasDhcpLease || !dhcpFlag) {
+          return `<div class="flags-inline">${badge(arpFlag, "badge-purple", arpTooltip)}</div>`;
+        }
 
         return `<div class="flags-inline">${badge(dhcpFlag, "badge-blue", dhcpTooltip)}<span class="flags-separator">|</span>${badge(arpFlag, "badge-purple", arpTooltip)}</div>`;
       };
