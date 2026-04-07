@@ -41,6 +41,8 @@ def get_dhcp_leases(client: MikroTikClient) -> list[dict[str, Any]]:
                 "comment": lease.get("comment", ""),
                 "status": lease.get("status", "unknown"),
                 "dynamic": lease.get("dynamic", "false") == "true",
+                "has_dhcp_lease": True,
+                "dhcp_is_dynamic": lease.get("dynamic", "false") == "true",
                 "expires_after": lease.get("expires-after", ""),
                 "last_seen": lease.get("last-seen", ""),
             }

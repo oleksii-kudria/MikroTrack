@@ -26,6 +26,8 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
             "dhcp_flags": {
                 "dynamic": lease.get("dynamic", False),
             },
+            "has_dhcp_lease": bool(lease.get("has_dhcp_lease", True)),
+            "dhcp_is_dynamic": bool(lease.get("dhcp_is_dynamic", lease.get("dynamic", False))),
             "arp_flags": {
                 "dynamic": False,
                 "dhcp": False,
@@ -58,9 +60,9 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
                 "arp_comment": entry.get("comment", ""),
                 "dhcp_status": "unknown",
                 "arp_status": entry.get("status", "unknown"),
-                "dhcp_flags": {
-                    "dynamic": False,
-                },
+                "dhcp_flags": {},
+                "has_dhcp_lease": False,
+                "dhcp_is_dynamic": None,
                 "arp_flags": {
                     "dynamic": entry.get("dynamic", False),
                     "dhcp": entry.get("dhcp", False),

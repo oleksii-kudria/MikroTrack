@@ -4,6 +4,7 @@ import unittest
 
 from app.api.main import _arp_flag, _device_state, _dhcp_flag
 from app.collector import get_arp_entries, get_dhcp_leases
+from app.device_builder import build_devices
 
 
 class _FakeResource:
@@ -24,9 +25,9 @@ class _FakeClient:
 
 class DeviceFlagRenderingTests(unittest.TestCase):
     def test_dhcp_flag_dynamic_and_static(self) -> None:
-        self.assertEqual(_dhcp_flag({"dynamic": True}), "D")
-        self.assertEqual(_dhcp_flag({"dynamic": False}), "S")
-        self.assertEqual(_dhcp_flag({}), "S")
+        self.assertEqual(_dhcp_flag(True, {"dynamic": True}), "D")
+        self.assertEqual(_dhcp_flag(True, {"dynamic": False}), "S")
+        self.assertIsNone(_dhcp_flag(False, {}))
 
     def test_arp_flag_matrix(self) -> None:
         self.assertEqual(_arp_flag({"dynamic": True, "complete": True}), "DC")
@@ -70,6 +71,9 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
 
         self.assertTrue(leases[0]["dynamic"])
         self.assertFalse(leases[1]["dynamic"])
+        self.assertTrue(leases[0]["has_dhcp_lease"])
+        self.assertTrue(leases[0]["dhcp_is_dynamic"])
+        self.assertFalse(leases[1]["dhcp_is_dynamic"])
 
     def test_collector_keeps_arp_dynamic_and_complete_flags(self) -> None:
         client = _FakeClient(
@@ -87,6 +91,25 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertTrue(arp_entries[0]["complete"])
         self.assertFalse(arp_entries[1]["dynamic"])
         self.assertFalse(arp_entries[1]["complete"])
+
+    def test_builder_does_not_fake_dhcp_for_arp_only_device(self) -> None:
+        devices = build_devices(
+            dhcp=[],
+            arp=[
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.20",
+                    "status": "reachable",
+                    "dynamic": True,
+                    "complete": True,
+                }
+            ],
+        )
+
+        self.assertEqual(len(devices), 1)
+        self.assertFalse(devices[0]["has_dhcp_lease"])
+        self.assertIsNone(devices[0]["dhcp_is_dynamic"])
+        self.assertEqual(devices[0]["dhcp_flags"], {})
 
 
 if __name__ == "__main__":
