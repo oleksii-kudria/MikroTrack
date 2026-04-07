@@ -271,6 +271,10 @@
         background: #dc2626;
       }
 
+      .status-unknown {
+        background: #6b7280;
+      }
+
       .changes {
         margin: 0;
         padding-left: 18px;
@@ -583,9 +587,12 @@
       };
 
       const buildStatusMac = (item) => {
-        const state = item.active ? "active" : "inactive";
-        const cls = item.active ? "status-active" : "status-inactive";
-        return `<span class="status-mac"><span class="status-dot ${cls}" title="${state}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
+        const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
+        const state = ["online", "offline", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+        const cls = state === "online" ? "status-active" : state === "offline" ? "status-inactive" : "status-unknown";
+        const rawArpStatus = String(item.arp_status || "").trim();
+        const tooltip = rawArpStatus ? `${state} (arp status: ${rawArpStatus})` : state;
+        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
       };
 
       const renderDevices = (items) => {
