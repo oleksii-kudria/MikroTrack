@@ -25,10 +25,10 @@ def _snapshot_files() -> list[Path]:
     return sorted(path.glob("*.json"), reverse=True)
 
 
-def _load_latest_snapshot() -> tuple[list[dict[str, Any]], float] | tuple[None, None]:
+def _load_latest_snapshot() -> list[dict[str, Any]] | None:
     files = _snapshot_files()
     if not files:
-        return None, None
+        return None
 
     latest = files[0]
     with latest.open(encoding="utf-8") as handle:
@@ -37,7 +37,7 @@ def _load_latest_snapshot() -> tuple[list[dict[str, Any]], float] | tuple[None, 
     if not isinstance(payload, list):
         raise HTTPException(status_code=500, detail="Invalid snapshot format")
 
-    return payload, latest.stat().st_mtime
+    return payload
 
 
 def _parse_ts(value: str | None) -> datetime | None:
@@ -252,8 +252,8 @@ def list_events(limit: int = 200) -> dict[str, object]:
 @app.get("/api/devices")
 @app.get("/api/v1/devices")
 def list_devices() -> dict[str, object]:
-    snapshot, snapshot_mtime = _load_latest_snapshot()
-    if snapshot is None:
+    snapshot = _load_latest_snapshot()
+    if not isinstance(snapshot, list):
         return {"items": []}
 
     now = datetime.now(UTC)
@@ -287,7 +287,6 @@ def list_devices() -> dict[str, object]:
             session["offline_since"] = timestamp
             session["online_since"] = None
 
-    snapshot_ts = datetime.fromtimestamp(snapshot_mtime, tz=UTC)
     items: list[dict[str, Any]] = []
 
     for device in snapshot:
@@ -337,13 +336,6 @@ def list_devices() -> dict[str, object]:
             online_since = session.get("online_since")
         if not isinstance(offline_since, datetime) and isinstance(session, dict):
             offline_since = session.get("offline_since")
-
-        if not isinstance(state_changed_at, datetime):
-            state_changed_at = snapshot_ts
-        if device_state in {"online", "idle"} and not isinstance(online_since, datetime):
-            online_since = snapshot_ts
-        if device_state == "offline" and not isinstance(offline_since, datetime):
-            offline_since = snapshot_ts
 
         presence_duration_seconds = (
             max(0, int((now - online_since).total_seconds()))
@@ -395,8 +387,8 @@ def list_devices() -> dict[str, object]:
                 "entity_type": entity_type,
                 "interface_name": interface_name,
                 "active": active,
-                "last_change": state_changed_at.isoformat(),
-                "state_changed_at": state_changed_at.isoformat(),
+                "last_change": state_changed_at.isoformat() if isinstance(state_changed_at, datetime) else None,
+                "state_changed_at": state_changed_at.isoformat() if isinstance(state_changed_at, datetime) else None,
                 "online_since": online_since.isoformat() if isinstance(online_since, datetime) else None,
                 "offline_since": offline_since.isoformat() if isinstance(offline_since, datetime) else None,
                 "presence_duration_seconds": presence_duration_seconds,

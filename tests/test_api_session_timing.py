@@ -149,6 +149,35 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["presence_duration_seconds"])
         self.assertEqual(item["elapsed_seconds"], item["offline_duration_seconds"])
 
+    def test_api_does_not_fallback_to_snapshot_time_for_missing_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:33",
+                            "ip_address": "192.168.88.33",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "state_changed_at": None,
+                            "online_since": None,
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertIsNone(item["state_changed_at"])
+        self.assertIsNone(item["online_since"])
+        self.assertIsNone(item["offline_since"])
+        self.assertIsNone(item["presence_duration_seconds"])
+
 
 if __name__ == "__main__":
     unittest.main()
