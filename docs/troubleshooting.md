@@ -2,26 +2,36 @@
 
 ## 🇺🇦 Українською
 
-## connection refused
+Нижче наведені категорії помилок MikroTik API, які повертає MikroTrack:
+
+- `connection_error`
+- `tls_error`
+- `authentication_failed`
+- `access_denied`
+- `api_protocol_error`
+- `unexpected_response`
+
+### connection_error
 
 Симптоми:
 
 - неможливо підключитись до `MIKROTIK_HOST:MIKROTIK_PORT`
-- socket error з "connection refused"
+- timeout / connection refused / network unreachable
 
 Перевірки:
 
-- на MikroTik увімкнено `api-ssl`
-- порт вказаний правильно (типово `8729`)
+- на MikroTik увімкнено `api` або `api-ssl`
+- порт вказаний правильно (типово `8729` для `api-ssl`)
 - firewall дозволяє вхідне з'єднання з collector host
-- IP allow-list для сервісу MikroTik містить адресу collector
+- DNS/IP вказані коректно
 
-## ssl error
+### tls_error
 
 Симптоми:
 
 - помилка TLS handshake
-- certificate verify failed
+- `certificate verify failed`
+- `wrong version number` або інші SSL/TLS помилки
 
 Перевірки:
 
@@ -30,7 +40,7 @@
 - для self-signed сертифіката: `MIKROTIK_SSL_VERIFY=false` або правильна довіра до CA
 - дата/час роутера коректні
 
-## authentication failed
+### authentication_failed
 
 Симптоми:
 
@@ -43,23 +53,47 @@
 - акаунт не вимкнено
 - користувач має мінімум права `read`, `api`
 
-## not allowed (9)
+### access_denied
 
 Симптоми:
 
-- RouterOS API повертає `not allowed (9)`
+- TCP з'єднання встановлюється, але API сесія не ініціалізується
+- помилка доступу або закриття сесії на етапі авторизації
 
-Причина:
+Ймовірна причина:
 
-- користувачу бракує прав для запитаного path/command
+- IP collector не входить у `/ip service api-ssl address`
+- користувачу бракує політик для API
 
 Виправлення:
 
-- перевірити policy групи (мінімум `read,api`)
-- уникати надмірно обмеженої custom-групи
-- перевірити доступ до команди напряму в RouterOS terminal
+- перевірити allow-list для `api-ssl`
+- перевірити policy групи користувача (мінімум `read,api`)
 
-## persistence errors
+### api_protocol_error
+
+Симптоми:
+
+- помилки протоколу RouterOS API
+- несподіване завершення API-комунікації
+
+Перевірки:
+
+- сумісність версії RouterOS/API
+- стабільність каналу зв'язку
+- коректність налаштувань сервісу API
+
+### unexpected_response
+
+Симптоми:
+
+- API відповідає у форматі, який не очікує колектор
+
+Перевірки:
+
+- перевірити RouterOS версію та доступність потрібних API ресурсів
+
+### persistence errors
 
 Симптоми:
 
@@ -77,26 +111,36 @@
 
 ## 🇬🇧 English
 
-## connection refused
+Below are the MikroTik API error categories returned by MikroTrack:
+
+- `connection_error`
+- `tls_error`
+- `authentication_failed`
+- `access_denied`
+- `api_protocol_error`
+- `unexpected_response`
+
+### connection_error
 
 Symptoms:
 
 - cannot connect to `MIKROTIK_HOST:MIKROTIK_PORT`
-- socket error with "connection refused"
+- timeout / connection refused / network unreachable
 
 Checks:
 
-- MikroTik service `api-ssl` is enabled
-- port is correct (default `8729`)
+- MikroTik `api` or `api-ssl` service is enabled
+- port is correct (default `8729` for `api-ssl`)
 - firewall allows inbound connection from collector host
-- IP allow-list on MikroTik service includes collector address
+- DNS/IP configuration is correct
 
-## ssl error
+### tls_error
 
 Symptoms:
 
 - TLS handshake failure
-- certificate verify failed
+- `certificate verify failed`
+- `wrong version number` or other SSL/TLS failures
 
 Checks:
 
@@ -105,7 +149,7 @@ Checks:
 - if using self-signed certificate, set `MIKROTIK_SSL_VERIFY=false` or trust CA properly
 - router date/time are correct (important for certificate validation)
 
-## authentication failed
+### authentication_failed
 
 Symptoms:
 
@@ -118,23 +162,47 @@ Checks:
 - account is not disabled
 - user has enough policy rights (`read`, `api`)
 
-## not allowed (9)
+### access_denied
 
 Symptoms:
 
-- RouterOS API returns `not allowed (9)`
+- TCP connection is established, but API session is not initialized
+- access is denied or session closes during authorization
 
-Root cause:
+Likely causes:
 
-- user lacks permissions for requested path/command
+- collector IP is not included in `/ip service api-ssl address`
+- user does not have enough API policies
 
 Fix:
 
-- verify group policies include at least `read,api`
-- avoid using over-restricted custom group
-- test command access directly in RouterOS terminal
+- verify `api-ssl` allow-list includes collector IP
+- verify user group policies include at least `read,api`
 
-## persistence errors
+### api_protocol_error
+
+Symptoms:
+
+- RouterOS API protocol errors
+- unexpected API communication interruption
+
+Checks:
+
+- RouterOS/API version compatibility
+- network stability
+- API service configuration correctness
+
+### unexpected_response
+
+Symptoms:
+
+- API responds with a format that collector does not expect
+
+Checks:
+
+- verify RouterOS version and required API resources
+
+### persistence errors
 
 Symptoms:
 
