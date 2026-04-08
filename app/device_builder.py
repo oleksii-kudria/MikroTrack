@@ -18,6 +18,10 @@ _ARP_STATUS_PRIORITY = {
 }
 
 
+def _normalize_mac(mac_raw: Any) -> str:
+    return str(mac_raw or "").strip().upper()
+
+
 def _is_link_local(ip_raw: str) -> bool:
     ip_text = str(ip_raw or "").strip()
     if not ip_text:
@@ -56,13 +60,13 @@ def build_devices(
     bridge_hosts = bridge_hosts or []
     interface_macs = interface_macs or []
     interface_by_mac = {
-        str(item.get("mac_address", "")).strip(): item
+        _normalize_mac(item.get("mac_address", "")): item
         for item in interface_macs
-        if str(item.get("mac_address", "")).strip()
+        if _normalize_mac(item.get("mac_address", ""))
     }
 
     for lease in dhcp:
-        mac_address = lease.get("mac_address", "")
+        mac_address = _normalize_mac(lease.get("mac_address", ""))
         if not mac_address:
             logger.debug("Skipping DHCP lease without MAC: %s", lease)
             continue
@@ -110,7 +114,7 @@ def build_devices(
 
     arp_records_by_mac: dict[str, list[dict[str, Any]]] = {}
     for entry in arp:
-        mac_address = entry.get("mac_address", "")
+        mac_address = _normalize_mac(entry.get("mac_address", ""))
         if not mac_address:
             logger.debug("Skipping ARP entry without MAC: %s", entry)
             continue
@@ -127,7 +131,7 @@ def build_devices(
         ]
 
         entry = display_arp
-        mac_address = entry.get("mac_address", "")
+        mac_address = _normalize_mac(entry.get("mac_address", ""))
         arp_status = normalize_arp_status(entry.get("status", "unknown"))
         arp_state = fused_device_state(arp_status, bridge_host_present=False)
 
@@ -215,7 +219,7 @@ def build_devices(
 
     bridge_records_by_mac: dict[str, list[dict[str, Any]]] = {}
     for record in bridge_hosts:
-        mac_address = str(record.get("mac_address", "")).strip()
+        mac_address = _normalize_mac(record.get("mac_address", ""))
         if not mac_address:
             continue
         bridge_records_by_mac.setdefault(mac_address, []).append(record)
@@ -295,7 +299,7 @@ def build_devices(
         if _is_link_local(str(device.get("ip_address", ""))):
             badges.append("LINK-LOCAL")
 
-        interface = interface_by_mac.get(str(device.get("mac_address", "")).strip())
+        interface = interface_by_mac.get(_normalize_mac(device.get("mac_address", "")))
         if interface is not None:
             device["entity_type"] = "interface"
             device["interface_name"] = str(interface.get("interface_name", "")).strip()

@@ -547,7 +547,7 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIsNone(snapshot["online_since"])
         self.assertIsNone(snapshot["offline_since"])
 
-    def test_save_snapshot_unknown_with_presence_evidence_updates_last_change_on_source_change(self) -> None:
+    def test_save_snapshot_unknown_with_presence_evidence_preserves_last_change_on_source_change(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
             Path(tmp, "2020-01-01T00-00-00.json").write_text(
@@ -583,8 +583,47 @@ class SnapshotDiffTests(unittest.TestCase):
             snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
 
-        self.assertNotEqual(snapshot["state_changed_at"], "2026-04-08T15:00:00+00:00")
+        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T15:00:00+00:00")
         self.assertEqual(snapshot["online_since"], "2026-04-08T15:00:00+00:00")
+        self.assertIsNone(snapshot["offline_since"])
+
+    def test_save_snapshot_preserves_identity_for_mac_with_different_letter_case(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:50",
+                            "ip_address": "192.168.88.50",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "aa:aa:aa:aa:aa:50",
+                        "ip_address": "192.168.88.50",
+                        "source": ["dhcp", "arp"],
+                        "arp_status": "reachable",
+                        "arp_state": "online",
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T10:00:00+00:00")
+        self.assertEqual(snapshot["online_since"], "2026-04-08T10:00:00+00:00")
         self.assertIsNone(snapshot["offline_since"])
 
     def test_save_snapshot_unchanged_online_initializes_missing_session_timestamps(self) -> None:
