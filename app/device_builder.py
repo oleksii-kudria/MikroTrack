@@ -50,9 +50,16 @@ def build_devices(
     dhcp: list[dict[str, Any]],
     arp: list[dict[str, Any]],
     bridge_hosts: list[dict[str, Any]] | None = None,
+    interface_macs: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     devices_by_mac: dict[str, dict[str, Any]] = {}
     bridge_hosts = bridge_hosts or []
+    interface_macs = interface_macs or []
+    interface_by_mac = {
+        str(item.get("mac_address", "")).strip(): item
+        for item in interface_macs
+        if str(item.get("mac_address", "")).strip()
+    }
 
     for lease in dhcp:
         mac_address = lease.get("mac_address", "")
@@ -94,6 +101,9 @@ def build_devices(
             "created_by": "dhcp",
             "arp_type": "unknown",
             "source": ["dhcp"],
+            "entity_type": "client",
+            "interface_name": "",
+            "badges": [],
         }
         logger.debug("merge steps: added DHCP device for MAC=%s", mac_address)
 
@@ -158,6 +168,9 @@ def build_devices(
                 "source": ["arp"],
                 "arp_records": sorted(mac_arp_records, key=_arp_priority),
                 "arp_secondary": arp_secondary,
+                "entity_type": "client",
+                "interface_name": "",
+                "badges": [],
             }
             logger.debug("merge steps: added ARP-only device for MAC=%s", mac_address)
             continue
@@ -242,6 +255,9 @@ def build_devices(
                 "source": ["bridge_host"],
                 "arp_records": [],
                 "arp_secondary": [],
+                "entity_type": "client",
+                "interface_name": "",
+                "badges": [],
             }
             continue
 
@@ -261,6 +277,21 @@ def build_devices(
             "bridge_host_present": bridge_host_present,
             "bridge_host_last_seen": str(device.get("bridge_host_last_seen", "")),
         }
+        badges: list[str] = []
+        if arp_status == "permanent":
+            badges.append("PERM")
+        if _is_link_local(str(device.get("ip_address", ""))):
+            badges.append("LINK-LOCAL")
+
+        interface = interface_by_mac.get(str(device.get("mac_address", "")).strip())
+        if interface is not None:
+            device["entity_type"] = "interface"
+            device["interface_name"] = str(interface.get("interface_name", "")).strip()
+            badges.append("INTERFACE")
+        else:
+            device["entity_type"] = "client"
+            device["interface_name"] = ""
+        device["badges"] = badges
 
     for device in devices_by_mac.values():
         if "arp_records" not in device:
