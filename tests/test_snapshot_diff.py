@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.persistence import configure_persistence, process_snapshot_diff
+from app.persistence import configure_persistence, process_snapshot_diff, save_snapshot
 
 
 class SnapshotDiffTests(unittest.TestCase):
@@ -317,6 +317,32 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(by_type["interface_detected"]["new_value"], "ether3")
         self.assertEqual(by_type["entity_type_detected"]["entity_type"], "interface")
         self.assertEqual(by_type["interface_detected"]["interface_name"], "ether3")
+
+    def test_save_snapshot_keeps_timestamps_when_state_does_not_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            first_device = {
+                "mac_address": "AA:AA:AA:AA:AA:40",
+                "ip_address": "192.168.88.40",
+                "source": ["arp"],
+                "arp_status": "reachable",
+                "arp_state": "online",
+            }
+            save_snapshot([first_device])
+            first_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            first_snapshot = json.loads(first_snapshot_path.read_text(encoding="utf-8"))[0]
+
+            self.assertIsNotNone(first_snapshot.get("state_changed_at"))
+            self.assertIsNotNone(first_snapshot.get("online_since"))
+            self.assertIsNone(first_snapshot.get("offline_since"))
+
+            save_snapshot([first_device])
+            second_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            second_snapshot = json.loads(second_snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(second_snapshot["state_changed_at"], first_snapshot["state_changed_at"])
+        self.assertEqual(second_snapshot["online_since"], first_snapshot["online_since"])
+        self.assertIsNone(second_snapshot["offline_since"])
 
 
 if __name__ == "__main__":

@@ -255,6 +255,93 @@ def _sanitize_presence_transition(previous_state: str, current_state: str) -> tu
     return prev, curr
 
 
+def _derive_presence_state(device: dict[str, Any]) -> str:
+    arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
+    bridge_host_present = bool(device.get("bridge_host_present", False))
+    raw_state = str(device.get("arp_state", "")).strip().lower()
+    state = raw_state or fused_device_state(arp_status, bridge_host_present)
+    return _normalized_presence_state(state)
+
+
+def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    previous_snapshot_path = _latest_snapshot_path()
+    previous_devices: list[dict[str, Any]] = []
+    if previous_snapshot_path is not None:
+        try:
+            with previous_snapshot_path.open("r", encoding="utf-8") as snapshot_file:
+                payload = json.load(snapshot_file)
+            if isinstance(payload, list):
+                previous_devices = [item for item in payload if isinstance(item, dict)]
+        except Exception:
+            logger.warning("Failed to load previous snapshot for stable timestamp propagation")
+
+    previous_by_mac = _index_devices_by_mac(previous_devices)
+    now_iso = _iso_timestamp()
+    enriched_devices: list[dict[str, Any]] = []
+
+    for current in current_devices:
+        mac = str(current.get("mac_address", "")).strip()
+        if not mac:
+            enriched_devices.append(current)
+            continue
+
+        previous = previous_by_mac.get(mac)
+        current_state = _derive_presence_state(current)
+        device = dict(current)
+
+        if previous is None:
+            if current_state in {"online", "idle"}:
+                device["state_changed_at"] = now_iso
+                device["online_since"] = now_iso
+                device["offline_since"] = None
+            elif current_state == "offline":
+                device["state_changed_at"] = now_iso
+                device["offline_since"] = now_iso
+                device["online_since"] = None
+            enriched_devices.append(device)
+            continue
+
+        previous_state = _derive_presence_state(previous)
+        previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, current_state)
+        previous_state_changed_at = previous.get("state_changed_at")
+        previous_online_since = previous.get("online_since")
+        previous_offline_since = previous.get("offline_since")
+
+        if previous_presence_state == current_presence_state:
+            device["state_changed_at"] = previous_state_changed_at
+            device["online_since"] = previous_online_since
+            device["offline_since"] = previous_offline_since
+            enriched_devices.append(device)
+            continue
+
+        device["state_changed_at"] = now_iso
+
+        if previous_presence_state == "offline" and current_presence_state in {"online", "idle"}:
+            device["online_since"] = now_iso
+            device["offline_since"] = None
+        elif previous_presence_state in {"online", "idle"} and current_presence_state == "offline":
+            device["online_since"] = None
+            device["offline_since"] = now_iso
+        elif previous_presence_state == "online" and current_presence_state == "idle":
+            device["online_since"] = previous_online_since
+            device["offline_since"] = None
+        elif previous_presence_state == "idle" and current_presence_state == "online":
+            device["online_since"] = previous_online_since
+            device["offline_since"] = None
+        else:
+            device["online_since"] = previous_online_since
+            device["offline_since"] = previous_offline_since
+
+        if current_presence_state in {"online", "idle"} and not device.get("online_since"):
+            device["online_since"] = now_iso
+        if current_presence_state == "offline" and not device.get("offline_since"):
+            device["offline_since"] = now_iso
+
+        enriched_devices.append(device)
+
+    return enriched_devices
+
+
 def _append_events(events: list[Event]) -> None:
     if not events:
         return
@@ -661,18 +748,19 @@ def process_snapshot_diff(current_devices: list[dict[str, Any]]) -> list[Event]:
 
 
 def save_snapshot(devices: list[dict]) -> None:
-    process_snapshot_diff(devices)
+    devices_with_timestamps = _apply_stable_timestamps(devices)
+    process_snapshot_diff(devices_with_timestamps)
 
     filename = f"{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.json"
     file_path = _persistence_path / filename
 
     with file_path.open("w", encoding="utf-8") as snapshot_file:
-        json.dump(devices, snapshot_file, indent=2, ensure_ascii=False)
+        json.dump(devices_with_timestamps, snapshot_file, indent=2, ensure_ascii=False)
 
     file_size = file_path.stat().st_size
     logger.info("Snapshot saved: %s", file_path)
     logger.debug("Snapshot file size: %d bytes", file_size)
-    logger.debug("Snapshot device count: %d", len(devices))
+    logger.debug("Snapshot device count: %d", len(devices_with_timestamps))
 
     removed_count = _cleanup_old_snapshots()
     logger.info("Retention cleanup done: removed %d files", removed_count)

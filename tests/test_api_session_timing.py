@@ -10,6 +10,35 @@ from app.api.main import list_devices
 
 
 class ApiSessionTimingTests(unittest.TestCase):
+    def test_api_uses_snapshot_raw_timestamps_without_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:30",
+                            "ip_address": "192.168.88.30",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "state_changed_at": "2026-04-08T10:01:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["status"], "online")
+        self.assertEqual(item["state_changed_at"], "2026-04-08T10:01:00+00:00")
+        self.assertEqual(item["online_since"], "2026-04-08T10:00:00+00:00")
+        self.assertIsNone(item["offline_since"])
+
     def test_idle_keeps_online_since_and_uses_state_changed_for_idle_duration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["PERSISTENCE_PATH"] = tmp
