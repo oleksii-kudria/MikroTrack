@@ -431,7 +431,7 @@
                 <th>Hostname</th>
                 <th>Comments</th>
                 <th>Flags / state</th>
-                <th>Last change</th>
+                <th>Session / state time</th>
               </tr>
             </thead>
             <tbody id="devices-table">
@@ -546,6 +546,18 @@
           return `${Math.floor(seconds / 60)}m ago`;
         }
         return `${Math.floor(seconds / 3600)}h ago`;
+      };
+
+      const fmtClock = (value) => {
+        const raw = String(value || "").trim();
+        if (!raw) {
+          return "-";
+        }
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) {
+          return "-";
+        }
+        return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
       };
 
       const escapeHtml = (value) =>
@@ -667,6 +679,24 @@
         return `<div class="badge-wrap">${parts.join("")}</div>`;
       };
 
+      const buildSessionCell = (item) => {
+        const state = String(item.status || "").toLowerCase();
+        const onlineSince = fmtClock(item.online_since);
+        const offlineSince = fmtClock(item.offline_since);
+        const stateChangedAt = fmtClock(item.state_changed_at);
+
+        if (state === "online") {
+          return `<div>Online since: <strong>${onlineSince}</strong></div><div class="muted">Last change: ${stateChangedAt}</div>`;
+        }
+        if (state === "idle") {
+          return `<div>Online since: <strong>${onlineSince}</strong></div><div class="muted">Idle since: ${stateChangedAt}</div>`;
+        }
+        if (state === "offline") {
+          return `<div>Offline since: <strong>${offlineSince}</strong></div>`;
+        }
+        return `<div>Last change: <strong>${stateChangedAt}</strong></div>`;
+      };
+
       const renderDevices = (items) => {
         if (!items.length) {
           devicesTable.innerHTML = '<tr><td class="empty" colspan="6">No devices found</td></tr>';
@@ -683,7 +713,7 @@
                 <td>${item.hostname || "-"}</td>
                 <td>${buildCommentBadges(item)}</td>
                 <td>${buildFlagsBadges(flags)}</td>
-                <td>${fmtElapsed(Number(item.elapsed_seconds || 0))}</td>
+                <td>${buildSessionCell(item)}</td>
               </tr>
             `;
           })

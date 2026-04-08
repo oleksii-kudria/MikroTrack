@@ -215,6 +215,74 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(by_type["arp_state_changed"]["old_state"], "online")
         self.assertEqual(by_type["arp_state_changed"]["new_state"], "permanent")
 
+    def test_diff_generates_session_started_and_ended_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:21",
+                            "ip_address": "192.168.88.81",
+                            "source": ["arp"],
+                            "arp_status": "failed",
+                            "arp_state": "offline",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+
+            started_events = process_snapshot_diff(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:21",
+                        "ip_address": "192.168.88.81",
+                        "source": ["arp"],
+                        "arp_status": "reachable",
+                        "arp_state": "online",
+                    }
+                ]
+            )
+
+            Path(tmp, "2026-04-05T23-11-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:21",
+                            "ip_address": "192.168.88.81",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            ended_events = process_snapshot_diff(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:21",
+                        "ip_address": "192.168.88.81",
+                        "source": ["arp"],
+                        "arp_status": "failed",
+                        "arp_state": "offline",
+                    }
+                ]
+            )
+
+        started_by_type = {event["event_type"]: event for event in started_events}
+        ended_by_type = {event["event_type"]: event for event in ended_events}
+
+        self.assertEqual(started_by_type["state_changed"]["old_state"], "offline")
+        self.assertEqual(started_by_type["state_changed"]["new_state"], "online")
+        self.assertEqual(started_by_type["session_started"]["event_type"], "session_started")
+
+        self.assertEqual(ended_by_type["state_changed"]["old_state"], "online")
+        self.assertEqual(ended_by_type["state_changed"]["new_state"], "offline")
+        self.assertEqual(ended_by_type["session_ended"]["event_type"], "session_ended")
+
     def test_diff_adds_entity_context_and_interface_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "2026-04-05T23-10-00.json").write_text(

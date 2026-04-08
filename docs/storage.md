@@ -88,6 +88,7 @@ chmod 755 /data/snapshots
 - IP/identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
 - DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
 - ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`, `arp_status_changed`, `arp_state_changed`
+- Session/state: `state_changed`, `session_started`, `session_ended`
 - Source: `SOURCE_CHANGED`
 - Combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
@@ -221,6 +222,7 @@ If no previous snapshot exists:
 - IP/identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
 - DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
 - ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`, `arp_status_changed`, `arp_state_changed`
+- Session/state: `state_changed`, `session_started`, `session_ended`
 - Source: `SOURCE_CHANGED`
 - Combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
