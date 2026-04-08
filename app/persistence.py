@@ -291,6 +291,49 @@ def _has_presence_evidence(device: dict[str, Any]) -> bool:
     return False
 
 
+_TRACKED_DEVICE_CHANGE_FIELDS: tuple[str, ...] = (
+    "arp_type",
+    "arp_flags",
+    "dhcp_is_dynamic",
+    "badges",
+    "dhcp_comment",
+    "arp_comment",
+    "host_name",
+    "primary_ip",
+    "source",
+    "interface_name",
+)
+
+
+def _normalized_tracked_value(field: str, device: dict[str, Any]) -> Any:
+    if field == "primary_ip":
+        return str(device.get("ip_address", "")).strip()
+    if field == "source":
+        return _source_value(device)
+    if field == "badges":
+        badges = device.get("badges", [])
+        if isinstance(badges, list):
+            return tuple(sorted(str(item).strip().upper() for item in badges if str(item).strip()))
+        return tuple()
+    if field in {"dhcp_comment", "arp_comment", "host_name", "interface_name", "arp_type"}:
+        return str(device.get(field, "")).strip()
+    if field == "dhcp_is_dynamic":
+        value = device.get(field)
+        return value if isinstance(value, bool) else None
+    if field == "arp_flags":
+        value = device.get(field, {})
+        return value if isinstance(value, dict) else {}
+    return device.get(field)
+
+
+def _changed_device_fields(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
+    changed: list[str] = []
+    for field in _TRACKED_DEVICE_CHANGE_FIELDS:
+        if _normalized_tracked_value(field, previous) != _normalized_tracked_value(field, current):
+            changed.append(field)
+    return changed
+
+
 def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
     previous_snapshot_path = _latest_snapshot_path()
     previous_devices: list[dict[str, Any]] = []
@@ -353,6 +396,8 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous_state_changed_at = previous.get("state_changed_at")
         previous_online_since = previous.get("online_since")
         previous_offline_since = previous.get("offline_since")
+        changed_fields = _changed_device_fields(previous, device)
+        device_changed = bool(changed_fields)
 
         if previous_state != merge_current_state:
             device["state_changed_at"] = now_iso
@@ -382,13 +427,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             )
 
             logger.debug(
-                "state timestamp merge: mac=%s old_state=%s new_state=%s "
+                "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
                 "old_online_since=%s new_online_since=%s "
                 "old_offline_since=%s new_offline_since=%s "
                 "old_state_changed_at=%s new_state_changed_at=%s decision=%s",
                 mac,
                 previous_state,
                 current_state,
+                device_changed,
+                changed_fields,
                 previous_online_since,
                 device.get("online_since"),
                 previous_offline_since,
@@ -396,6 +443,44 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 previous_state_changed_at,
                 device.get("state_changed_at"),
                 decision,
+            )
+            enriched_devices.append(device)
+            continue
+
+        if device_changed:
+            device["state_changed_at"] = now_iso
+            if merge_current_state in {"online", "idle"}:
+                device["online_since"] = previous_online_since
+                device["offline_since"] = None
+            elif merge_current_state == "offline":
+                device["online_since"] = None
+                device["offline_since"] = previous_offline_since
+            else:
+                device["online_since"] = previous_online_since
+                device["offline_since"] = previous_offline_since
+            _initialize_missing_session_timestamps(
+                device=device,
+                presence_state=current_presence_state,
+                now_iso=now_iso,
+                mac=mac,
+            )
+            logger.debug(
+                "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
+                "old_online_since=%s new_online_since=%s "
+                "old_offline_since=%s new_offline_since=%s "
+                "old_state_changed_at=%s new_state_changed_at=%s decision=%s",
+                mac,
+                previous_state,
+                current_state,
+                device_changed,
+                changed_fields,
+                previous_online_since,
+                device.get("online_since"),
+                previous_offline_since,
+                device.get("offline_since"),
+                previous_state_changed_at,
+                device.get("state_changed_at"),
+                "device_change_update_timestamp",
             )
             enriched_devices.append(device)
             continue
@@ -418,13 +503,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 mac=mac,
             )
             logger.debug(
-                "state timestamp merge: mac=%s old_state=%s new_state=%s "
+                "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
                 "old_online_since=%s new_online_since=%s "
                 "old_offline_since=%s new_offline_since=%s "
                 "old_state_changed_at=%s new_state_changed_at=%s decision=%s",
                 mac,
                 previous_state,
                 current_state,
+                device_changed,
+                changed_fields,
                 previous_online_since,
                 device.get("online_since"),
                 previous_offline_since,
