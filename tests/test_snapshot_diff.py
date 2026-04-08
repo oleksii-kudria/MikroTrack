@@ -549,6 +549,88 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIsNotNone(snapshot["offline_since"])
         self.assertIsNone(snapshot["online_since"])
 
+    def test_save_snapshot_offline_to_online_resets_session_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "B0:E4:5C:FD:BB:98",
+                            "ip_address": "192.168.88.98",
+                            "source": ["arp"],
+                            "arp_status": "failed",
+                            "arp_state": "offline",
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": None,
+                            "offline_since": "2026-04-08T10:00:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "B0:E4:5C:FD:BB:98",
+                        "ip_address": "192.168.88.98",
+                        "source": ["arp"],
+                        "arp_status": "reachable",
+                        "arp_state": "online",
+                        # stale value that must not be preserved on real transition
+                        "offline_since": "2026-04-08T10:00:00+00:00",
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertIsNotNone(snapshot["state_changed_at"])
+        self.assertEqual(snapshot["online_since"], snapshot["state_changed_at"])
+        self.assertIsNone(snapshot["offline_since"])
+
+    def test_save_snapshot_online_to_offline_resets_session_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:47",
+                            "ip_address": "192.168.88.47",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:47",
+                        "ip_address": "192.168.88.47",
+                        "source": ["arp"],
+                        "arp_status": "failed",
+                        "arp_state": "offline",
+                        # stale value that must not be preserved on real transition
+                        "online_since": "2026-04-08T10:00:00+00:00",
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertIsNotNone(snapshot["state_changed_at"])
+        self.assertEqual(snapshot["offline_since"], snapshot["state_changed_at"])
+        self.assertIsNone(snapshot["online_since"])
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
