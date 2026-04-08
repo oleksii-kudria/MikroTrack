@@ -24,3 +24,19 @@ def arp_state_from_status(raw_status: Any) -> str:
     if status == "permanent":
         return "permanent"
     return "unknown"
+
+
+def fused_device_state(raw_status: Any, bridge_host_present: bool) -> str:
+    status = normalize_arp_status(raw_status)
+
+    if status == "reachable":
+        return "online"
+    if bridge_host_present:
+        return "online"
+    if status in _IDLE_ARP_STATUSES:
+        return "idle"
+    if status in _OFFLINE_ARP_STATUSES:
+        return "offline"
+    if status == "permanent":
+        return "permanent"
+    return "unknown"

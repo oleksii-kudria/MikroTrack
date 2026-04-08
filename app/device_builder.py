@@ -4,7 +4,7 @@ import logging
 from ipaddress import ip_address
 from typing import Any
 
-from app.arp_logic import arp_state_from_status, normalize_arp_status
+from app.arp_logic import fused_device_state, normalize_arp_status
 
 logger = logging.getLogger("mikrotrack.device_builder")
 
@@ -46,8 +46,13 @@ def _select_primary_arp(arp_records: list[dict[str, Any]]) -> dict[str, Any] | N
     return by_status[0]
 
 
-def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_devices(
+    dhcp: list[dict[str, Any]],
+    arp: list[dict[str, Any]],
+    bridge_hosts: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     devices_by_mac: dict[str, dict[str, Any]] = {}
+    bridge_hosts = bridge_hosts or []
 
     for lease in dhcp:
         mac_address = lease.get("mac_address", "")
@@ -64,6 +69,14 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
             "dhcp_status": lease.get("status", "unknown"),
             "arp_status": "unknown",
             "arp_state": "unknown",
+            "bridge_host_present": False,
+            "bridge_host_interface": "",
+            "bridge_host_last_seen": "",
+            "evidence": {
+                "arp_status": "unknown",
+                "bridge_host_present": False,
+                "bridge_host_last_seen": "",
+            },
             "dhcp_flags": {
                 "dynamic": lease.get("dynamic", False),
             },
@@ -105,7 +118,7 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
         entry = display_arp
         mac_address = entry.get("mac_address", "")
         arp_status = normalize_arp_status(entry.get("status", "unknown"))
-        arp_state = arp_state_from_status(arp_status)
+        arp_state = fused_device_state(arp_status, bridge_host_present=False)
 
         arp_ip = primary_arp.get("ip_address", "") if primary_arp is not None else ""
         existing = devices_by_mac.get(mac_address)
@@ -120,6 +133,14 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
                 "dhcp_status": "unknown",
                 "arp_status": arp_status,
                 "arp_state": arp_state,
+                "bridge_host_present": False,
+                "bridge_host_interface": "",
+                "bridge_host_last_seen": "",
+                "evidence": {
+                    "arp_status": arp_status,
+                    "bridge_host_present": False,
+                    "bridge_host_last_seen": "",
+                },
                 "dhcp_flags": {},
                 "has_dhcp_lease": False,
                 "dhcp_is_dynamic": None,
@@ -175,6 +196,71 @@ def build_devices(dhcp: list[dict[str, Any]], arp: list[dict[str, Any]]) -> list
         if arp_ip and (not dhcp_ip or _is_link_local(dhcp_ip)):
             logger.debug("merge steps: MAC=%s primary IP set from ARP=%s", mac_address, arp_ip)
             existing["ip_address"] = arp_ip
+
+    bridge_records_by_mac: dict[str, list[dict[str, Any]]] = {}
+    for record in bridge_hosts:
+        mac_address = str(record.get("mac_address", "")).strip()
+        if not mac_address:
+            continue
+        bridge_records_by_mac.setdefault(mac_address, []).append(record)
+
+    for mac_address, records in bridge_records_by_mac.items():
+        selected = records[0]
+        existing = devices_by_mac.get(mac_address)
+        if existing is None:
+            devices_by_mac[mac_address] = {
+                "mac_address": mac_address,
+                "ip_address": "",
+                "host_name": "",
+                "dhcp_comment": "",
+                "arp_comment": "",
+                "dhcp_status": "unknown",
+                "arp_status": "unknown",
+                "arp_state": "online",
+                "bridge_host_present": True,
+                "bridge_host_interface": selected.get("interface", ""),
+                "bridge_host_last_seen": selected.get("bridge_host_last_seen", ""),
+                "evidence": {
+                    "arp_status": "unknown",
+                    "bridge_host_present": True,
+                    "bridge_host_last_seen": selected.get("bridge_host_last_seen", ""),
+                },
+                "dhcp_flags": {},
+                "has_dhcp_lease": False,
+                "dhcp_is_dynamic": None,
+                "arp_flags": {
+                    "dynamic": False,
+                    "dhcp": False,
+                    "complete": False,
+                    "disabled": False,
+                    "invalid": False,
+                    "published": False,
+                },
+                "has_arp_entry": False,
+                "created_by": "manual",
+                "arp_type": "unknown",
+                "source": ["bridge_host"],
+                "arp_records": [],
+                "arp_secondary": [],
+            }
+            continue
+
+        if "bridge_host" not in existing["source"]:
+            existing["source"].append("bridge_host")
+
+        existing["bridge_host_present"] = True
+        existing["bridge_host_interface"] = selected.get("interface", "")
+        existing["bridge_host_last_seen"] = selected.get("bridge_host_last_seen", "")
+
+    for device in devices_by_mac.values():
+        bridge_host_present = bool(device.get("bridge_host_present", False))
+        arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
+        device["arp_state"] = fused_device_state(arp_status, bridge_host_present)
+        device["evidence"] = {
+            "arp_status": arp_status,
+            "bridge_host_present": bridge_host_present,
+            "bridge_host_last_seen": str(device.get("bridge_host_last_seen", "")),
+        }
 
     for device in devices_by_mac.values():
         if "arp_records" not in device:

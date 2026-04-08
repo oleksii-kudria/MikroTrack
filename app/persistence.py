@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from app.arp_logic import arp_state_from_status, normalize_arp_status
+from app.arp_logic import fused_device_state, normalize_arp_status
 from app.exceptions import MikroTrackError
 
 logger = logging.getLogger("mikrotrack")
@@ -199,6 +199,25 @@ def _build_arp_transition_event(
         "old_value": old_value,
         "new_value": new_value,
     }
+
+
+def _online_reason(arp_status: str, bridge_host_present: bool) -> str:
+    if normalize_arp_status(arp_status) == "reachable":
+        return "arp_reachable"
+    if bridge_host_present:
+        return "bridge_host_detected"
+    return "unknown"
+
+
+def _state_reason(state: str, arp_status: str, bridge_host_present: bool) -> str:
+    if state == "online":
+        return _online_reason(arp_status, bridge_host_present)
+    normalized = normalize_arp_status(arp_status)
+    if state == "idle" and normalized in {"stale", "delay", "probe"}:
+        return f"arp_{normalized}"
+    if state == "offline" and normalized in {"failed", "incomplete"}:
+        return f"arp_{normalized}"
+    return "no_evidence"
 
 
 def _append_events(events: list[Event]) -> None:
@@ -400,8 +419,14 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             events.append(event)
             _log_event(event)
 
-        previous_arp_state = str(previous.get("arp_state", "")).strip().lower() or arp_state_from_status(previous_arp_status)
-        current_arp_state = str(current.get("arp_state", "")).strip().lower() or arp_state_from_status(current_arp_status)
+        previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
+        current_bridge_host_present = bool(current.get("bridge_host_present", False))
+        previous_arp_state = str(previous.get("arp_state", "")).strip().lower() or fused_device_state(
+            previous_arp_status, previous_bridge_host_present
+        )
+        current_arp_state = str(current.get("arp_state", "")).strip().lower() or fused_device_state(
+            current_arp_status, current_bridge_host_present
+        )
         if previous_arp_state != current_arp_state:
             changed_count += 1
             logger.debug("[arp_state_changed] ARP state changed: %s -> %s", previous_arp_state, current_arp_state)
@@ -415,6 +440,41 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             )
             events.append(event)
             _log_event(event)
+
+            if current_arp_state in {"online", "offline", "idle"}:
+                reason = _state_reason(current_arp_state, current_arp_status, current_bridge_host_present)
+                device_event = {
+                    "timestamp": _iso_timestamp(),
+                    "event_type": f"device_{current_arp_state}",
+                    "type": f"device_{current_arp_state}",
+                    "mac": mac,
+                    "reason": reason,
+                    "old_value": previous_arp_state,
+                    "new_value": current_arp_state,
+                }
+                events.append(device_event)
+                _log_event(device_event)
+
+        previous_evidence = {
+            "arp_status": previous_arp_status,
+            "bridge_host_present": previous_bridge_host_present,
+            "bridge_host_last_seen": str(previous.get("bridge_host_last_seen", "")),
+        }
+        current_evidence = {
+            "arp_status": current_arp_status,
+            "bridge_host_present": current_bridge_host_present,
+            "bridge_host_last_seen": str(current.get("bridge_host_last_seen", "")),
+        }
+        if previous_evidence != current_evidence:
+            changed_count += 1
+            evidence_event = _build_event(
+                "evidence_changed",
+                mac,
+                old_value=previous_evidence,
+                new_value=current_evidence,
+            )
+            events.append(evidence_event)
+            _log_event(evidence_event)
 
         previous_source = _source_value(previous)
         current_source = _source_value(current)

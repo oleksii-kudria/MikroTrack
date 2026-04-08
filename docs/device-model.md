@@ -26,6 +26,15 @@ MikroTrack читає ARP table з `/ip/arp/print` та нормалізує:
 - `dynamic`/router flags → `arp_flags`
 - `comment` → `arp_comment`
 
+## Bridge Host поля
+
+MikroTrack читає bridge host table з `/interface/bridge/host/print` та нормалізує:
+
+- `mac-address` → `mac_address`
+- `interface` → `bridge_host_interface`
+- `last-seen` → `bridge_host_last_seen`
+- derived flag → `bridge_host_present`
+
 ## Прапорці
 
 ### DHCP flags
@@ -60,15 +69,16 @@ MikroTrack читає ARP table з `/ip/arp/print` та нормалізує:
 - `incomplete`
 - `permanent`
 
-### ARP derived state mapping
+### Device state mapping (ARP + Bridge Host fusion)
 
-- `reachable` → `online`
+- `reachable` ARP → `online` (highest priority)
+- if `bridge_host_present = true` → `online`
 - `stale` / `delay` / `probe` → `idle`
 - `failed` / `incomplete` → `offline`
-- `permanent` → `permanent` (static ARP entry type)
+- `permanent` + no bridge host → `permanent`
 - unknown values → `unknown`
 
-> `permanent` не трактуємо як `online` або `offline`.
+> `permanent` саме по собі не означає `online`.
 
 ## Приклад unified JSON
 
@@ -120,6 +130,15 @@ MikroTrack reads ARP table from `/ip/arp/print` and normalizes:
 - `dynamic`/router flags → `arp_flags`
 - `comment` → `arp_comment`
 
+## Bridge Host fields
+
+MikroTrack reads bridge host table from `/interface/bridge/host/print` and normalizes:
+
+- `mac-address` → `mac_address`
+- `interface` → `bridge_host_interface`
+- `last-seen` → `bridge_host_last_seen`
+- derived flag → `bridge_host_present`
+
 ## Flags
 
 ### DHCP flags
@@ -154,12 +173,13 @@ MikroTrack reads ARP table from `/ip/arp/print` and normalizes:
 - `incomplete`
 - `permanent`
 
-### ARP derived state mapping
+### Device state mapping (ARP + Bridge Host fusion)
 
-- `reachable` → `online`
+- `reachable` ARP → `online` (highest priority)
+- if `bridge_host_present = true` → `online`
 - `stale` / `delay` / `probe` → `idle`
 - `failed` / `incomplete` → `offline`
-- `permanent` → `permanent` (static ARP entry type)
+- `permanent` + no bridge host → `permanent`
 - unknown values → `unknown`
 
-> `permanent` must not be interpreted as `online` or `offline`.
+> `permanent` alone must not be interpreted as `online`.
