@@ -344,6 +344,90 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(second_snapshot["online_since"], first_snapshot["online_since"])
         self.assertIsNone(second_snapshot["offline_since"])
 
+    def test_save_snapshot_updates_last_change_when_arp_type_changes_without_state_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:4A",
+                            "ip_address": "192.168.88.74",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "arp_type": "dynamic",
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:4A",
+                        "ip_address": "192.168.88.74",
+                        "source": ["arp"],
+                        "arp_status": "reachable",
+                        "arp_state": "online",
+                        "arp_type": "static",
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertNotEqual(snapshot["state_changed_at"], "2026-04-08T10:00:00+00:00")
+        self.assertEqual(snapshot["online_since"], "2026-04-08T10:00:00+00:00")
+        self.assertIsNone(snapshot["offline_since"])
+
+    def test_save_snapshot_updates_last_change_when_comment_or_badges_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:4B",
+                            "ip_address": "192.168.88.75",
+                            "source": ["dhcp", "arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "arp_comment": "",
+                            "badges": [],
+                            "state_changed_at": "2026-04-08T11:00:00+00:00",
+                            "online_since": "2026-04-08T11:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:4B",
+                        "ip_address": "192.168.88.75",
+                        "source": ["dhcp", "arp"],
+                        "arp_status": "reachable",
+                        "arp_state": "online",
+                        "arp_comment": "manual",
+                        "badges": ["PERM"],
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertNotEqual(snapshot["state_changed_at"], "2026-04-08T11:00:00+00:00")
+        self.assertEqual(snapshot["online_since"], "2026-04-08T11:00:00+00:00")
+        self.assertIsNone(snapshot["offline_since"])
+
     def test_save_snapshot_keeps_offline_session_timestamps_for_unchanged_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
@@ -429,7 +513,7 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIsNone(snapshot["online_since"])
         self.assertIsNone(snapshot["offline_since"])
 
-    def test_save_snapshot_unknown_with_presence_evidence_keeps_previous_session(self) -> None:
+    def test_save_snapshot_unknown_with_presence_evidence_updates_last_change_on_source_change(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
             Path(tmp, "2020-01-01T00-00-00.json").write_text(
@@ -465,7 +549,7 @@ class SnapshotDiffTests(unittest.TestCase):
             snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
 
-        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T15:00:00+00:00")
+        self.assertNotEqual(snapshot["state_changed_at"], "2026-04-08T15:00:00+00:00")
         self.assertEqual(snapshot["online_since"], "2026-04-08T15:00:00+00:00")
         self.assertIsNone(snapshot["offline_since"])
 
