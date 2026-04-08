@@ -333,6 +333,12 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 device["state_changed_at"] = None
                 device["online_since"] = None
                 device["offline_since"] = None
+            _initialize_missing_session_timestamps(
+                device=device,
+                presence_state=current_state,
+                now_iso=now_iso,
+                mac=mac,
+            )
             enriched_devices.append(device)
             continue
 
@@ -359,6 +365,12 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             else:
                 device["online_since"] = previous_online_since
                 device["offline_since"] = previous_offline_since
+            _initialize_missing_session_timestamps(
+                device=device,
+                presence_state=current_presence_state,
+                now_iso=now_iso,
+                mac=mac,
+            )
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s "
                 "old_online_since=%s new_online_since=%s "
@@ -393,10 +405,12 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device["online_since"] = previous_online_since
             device["offline_since"] = previous_offline_since
 
-        if current_presence_state in {"online", "idle"} and not device.get("online_since"):
-            device["online_since"] = now_iso
-        if current_presence_state == "offline" and not device.get("offline_since"):
-            device["offline_since"] = now_iso
+        _initialize_missing_session_timestamps(
+            device=device,
+            presence_state=current_presence_state,
+            now_iso=now_iso,
+            mac=mac,
+        )
 
         logger.debug(
             "state timestamp merge: mac=%s old_state=%s new_state=%s "
@@ -414,6 +428,41 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         enriched_devices.append(device)
 
     return enriched_devices
+
+
+def _initialize_missing_session_timestamps(
+    *,
+    device: dict[str, Any],
+    presence_state: str,
+    now_iso: str,
+    mac: str,
+) -> None:
+    initialized_online_since = False
+    initialized_offline_since = False
+    initialized_state_changed_at = False
+
+    if presence_state in {"online", "idle"} and not device.get("online_since"):
+        device["online_since"] = now_iso
+        initialized_online_since = True
+
+    if presence_state == "offline" and not device.get("offline_since"):
+        device["offline_since"] = now_iso
+        initialized_offline_since = True
+
+    if (initialized_online_since or initialized_offline_since) and not device.get("state_changed_at"):
+        device["state_changed_at"] = now_iso
+        initialized_state_changed_at = True
+
+    if initialized_online_since or initialized_offline_since or initialized_state_changed_at:
+        logger.debug(
+            "session timestamp initialized: mac=%s state=%s online_since_initialized=%s "
+            "offline_since_initialized=%s state_changed_at_initialized=%s",
+            mac,
+            presence_state,
+            initialized_online_since,
+            initialized_offline_since,
+            initialized_state_changed_at,
+        )
 
 
 def _append_events(events: list[Event]) -> None:
