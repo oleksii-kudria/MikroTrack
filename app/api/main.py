@@ -327,9 +327,16 @@ def list_devices() -> dict[str, object]:
         interface_name = str(device.get("interface_name", "")).strip()
         session = session_by_mac.get(mac, {})
 
-        state_changed_at = session.get("state_changed_at") if isinstance(session, dict) else None
-        online_since = session.get("online_since") if isinstance(session, dict) else None
-        offline_since = session.get("offline_since") if isinstance(session, dict) else None
+        state_changed_at = _parse_ts(str(device.get("state_changed_at", "")))
+        online_since = _parse_ts(str(device.get("online_since", "")))
+        offline_since = _parse_ts(str(device.get("offline_since", "")))
+
+        if not isinstance(state_changed_at, datetime) and isinstance(session, dict):
+            state_changed_at = session.get("state_changed_at")
+        if not isinstance(online_since, datetime) and isinstance(session, dict):
+            online_since = session.get("online_since")
+        if not isinstance(offline_since, datetime) and isinstance(session, dict):
+            offline_since = session.get("offline_since")
 
         if not isinstance(state_changed_at, datetime):
             state_changed_at = snapshot_ts
