@@ -76,6 +76,7 @@ def build_devices(
             "dhcp_status": lease.get("status", "unknown"),
             "arp_status": "unknown",
             "arp_state": "unknown",
+            "fused_state": "unknown",
             "bridge_host_present": False,
             "bridge_host_interface": "",
             "bridge_host_last_seen": "",
@@ -143,6 +144,7 @@ def build_devices(
                 "dhcp_status": "unknown",
                 "arp_status": arp_status,
                 "arp_state": arp_state,
+                "fused_state": arp_state,
                 "bridge_host_present": False,
                 "bridge_host_interface": "",
                 "bridge_host_last_seen": "",
@@ -183,6 +185,7 @@ def build_devices(
         existing["arp_comment"] = entry.get("comment", "")
         existing["arp_status"] = arp_status
         existing["arp_state"] = arp_state
+        existing["fused_state"] = arp_state
         existing["arp_flags"] = {
             "dynamic": entry.get("dynamic", False),
             "dhcp": entry.get("dhcp", False),
@@ -230,6 +233,7 @@ def build_devices(
                 "dhcp_status": "unknown",
                 "arp_status": "unknown",
                 "arp_state": "online",
+                "fused_state": "online",
                 "bridge_host_present": True,
                 "bridge_host_interface": selected.get("interface", ""),
                 "bridge_host_last_seen": selected.get("bridge_host_last_seen", ""),
@@ -271,12 +275,20 @@ def build_devices(
     for device in devices_by_mac.values():
         bridge_host_present = bool(device.get("bridge_host_present", False))
         arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
-        device["arp_state"] = fused_device_state(arp_status, bridge_host_present)
+        fused_state = fused_device_state(arp_status, bridge_host_present)
+        device["arp_state"] = fused_state
+        device["fused_state"] = fused_state
         device["evidence"] = {
             "arp_status": arp_status,
             "bridge_host_present": bridge_host_present,
             "bridge_host_last_seen": str(device.get("bridge_host_last_seen", "")),
         }
+        logger.debug(
+            "MAC=%s arp_status=%s fused_state=%s decision=normalized",
+            str(device.get("mac_address", "")).strip(),
+            arp_status,
+            fused_state,
+        )
         badges: list[str] = []
         if arp_status == "permanent":
             badges.append("PERM")

@@ -240,7 +240,7 @@ def _state_reason(state: str, arp_status: str, bridge_host_present: bool) -> str
 
 def _normalized_device_state(state: str) -> str:
     normalized = str(state).strip().lower()
-    return normalized if normalized in {"online", "idle", "offline", "permanent", "unknown"} else "unknown"
+    return normalized if normalized in {"online", "idle", "offline", "unknown"} else "unknown"
 
 
 def _normalized_presence_state(state: str) -> str:
@@ -261,13 +261,13 @@ def _sanitize_presence_transition(previous_state: str, current_state: str) -> tu
 
 
 def _derive_device_state(device: dict[str, Any]) -> str:
+    fused_state = str(device.get("fused_state", "")).strip().lower()
+    if fused_state:
+        return _normalized_device_state(fused_state)
+
+    # Backward-compatible fallback for old snapshots without fused_state.
     arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
     bridge_host_present = bool(device.get("bridge_host_present", False))
-    raw_state = str(device.get("arp_state", "")).strip().lower()
-    if raw_state:
-        return _normalized_device_state(raw_state)
-    if arp_status == "permanent":
-        return "permanent"
     return _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
 
 
@@ -789,45 +789,41 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
 
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(current.get("bridge_host_present", False))
-        previous_arp_state = str(previous.get("arp_state", "")).strip().lower() or fused_device_state(
-            previous_arp_status, previous_bridge_host_present
-        )
-        current_arp_state = str(current.get("arp_state", "")).strip().lower() or fused_device_state(
-            current_arp_status, current_bridge_host_present
-        )
-        if previous_arp_state != current_arp_state:
+        previous_fused_state = _derive_device_state(previous)
+        current_fused_state = _derive_device_state(current)
+        if previous_fused_state != current_fused_state:
             changed_count += 1
-            logger.debug("[arp_state_changed] ARP state changed: %s -> %s", previous_arp_state, current_arp_state)
+            logger.debug("[arp_state_changed] Fused state changed: %s -> %s", previous_fused_state, current_fused_state)
             event = _build_arp_transition_event(
                 "arp_state_changed",
                 mac,
                 device=current,
                 old_key="old_state",
                 new_key="new_state",
-                old_value=previous_arp_state,
-                new_value=current_arp_state,
+                old_value=previous_fused_state,
+                new_value=current_fused_state,
             )
             events.append(event)
             _log_event(event)
 
-            if current_arp_state in {"online", "offline", "idle"}:
-                reason = _state_reason(current_arp_state, current_arp_status, current_bridge_host_present)
+            if current_fused_state in {"online", "offline", "idle"}:
+                reason = _state_reason(current_fused_state, current_arp_status, current_bridge_host_present)
                 device_event = {
                     "timestamp": _iso_timestamp(),
-                    "event_type": f"device_{current_arp_state}",
-                    "type": f"device_{current_arp_state}",
+                    "event_type": f"device_{current_fused_state}",
+                    "type": f"device_{current_fused_state}",
                     "mac": mac,
                     "reason": reason,
-                    "old_value": previous_arp_state,
-                    "new_value": current_arp_state,
+                    "old_value": previous_fused_state,
+                    "new_value": current_fused_state,
                 }
                 device_event.update(_event_context(current))
                 events.append(device_event)
                 _log_event(device_event)
 
             previous_presence_state, current_presence_state = _sanitize_presence_transition(
-                previous_arp_state,
-                current_arp_state,
+                previous_fused_state,
+                current_fused_state,
             )
             if previous_presence_state != "unknown" and current_presence_state != "unknown":
                 state_changed_event = {
