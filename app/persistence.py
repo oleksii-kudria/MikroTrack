@@ -125,7 +125,7 @@ def _latest_snapshot_path() -> Path | None:
 def _index_devices_by_mac(devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     indexed: dict[str, dict[str, Any]] = {}
     for device in devices:
-        mac = str(device.get("mac_address", "")).strip()
+        mac = str(device.get("mac_address", "")).strip().upper()
         if mac:
             indexed[mac] = device
     return indexed
@@ -300,7 +300,6 @@ _TRACKED_DEVICE_CHANGE_FIELDS: tuple[str, ...] = (
     "arp_comment",
     "host_name",
     "primary_ip",
-    "source",
     "interface_name",
 )
 
@@ -351,7 +350,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
     enriched_devices: list[dict[str, Any]] = []
 
     for current in current_devices:
-        mac = str(current.get("mac_address", "")).strip()
+        mac = str(current.get("mac_address", "")).strip().upper()
         if not mac:
             enriched_devices.append(current)
             continue
@@ -396,8 +395,18 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous_state_changed_at = previous.get("state_changed_at")
         previous_online_since = previous.get("online_since")
         previous_offline_since = previous.get("offline_since")
+        previous_source = _source_value(previous)
+        current_source = _source_value(device)
         changed_fields = _changed_device_fields(previous, device)
         device_changed = bool(changed_fields)
+
+        if previous_source != current_source:
+            logger.debug(
+                "identity merge: MAC=%s old_source=%s new_source=%s identity=preserved",
+                mac,
+                previous_source,
+                current_source,
+            )
 
         if previous_state != merge_current_state:
             device["state_changed_at"] = now_iso
