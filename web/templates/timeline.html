@@ -538,16 +538,6 @@
       const devicesRefreshButton = document.getElementById("devices-refresh");
       let refreshTimer = null;
 
-      const fmtElapsed = (seconds) => {
-        if (seconds < 60) {
-          return `${seconds}s ago`;
-        }
-        if (seconds < 3600) {
-          return `${Math.floor(seconds / 60)}m ago`;
-        }
-        return `${Math.floor(seconds / 3600)}h ago`;
-      };
-
       const fmtClock = (value) => {
         const raw = String(value || "").trim();
         if (!raw) {
@@ -558,6 +548,34 @@
           return "-";
         }
         return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+      };
+
+      const parseTimestampMs = (value) => {
+        const raw = String(value || "").trim();
+        if (!raw) {
+          return null;
+        }
+        const parsed = Date.parse(raw);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
+
+      const pad2 = (value) => String(value).padStart(2, "0");
+
+      const fmtRelativeTimer = (startMs, nowMs) => {
+        const elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+        const days = Math.floor(elapsedSeconds / 86400);
+        if (days >= 1) {
+          return `${days} day${days === 1 ? "" : "s"} ago`;
+        }
+
+        const hours = Math.floor(elapsedSeconds / 3600);
+        const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+        const seconds = elapsedSeconds % 60;
+
+        if (elapsedSeconds < 3600) {
+          return `${pad2(minutes)}:${pad2(seconds)}`;
+        }
+        return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
       };
 
       const escapeHtml = (value) =>
@@ -681,25 +699,63 @@
 
       const buildSessionCell = (item) => {
         const state = String(item.status || "").toLowerCase();
-        const onlineSince = fmtClock(item.online_since);
-        const offlineSince = fmtClock(item.offline_since);
+        const onlineSinceRaw = String(item.online_since || "").trim();
+        const offlineSinceRaw = String(item.offline_since || "").trim();
+        const stateChangedRaw = String(item.state_changed_at || "").trim();
+        const onlineSince = fmtClock(onlineSinceRaw);
+        const offlineSince = fmtClock(offlineSinceRaw);
         const stateChangedAt = fmtClock(item.state_changed_at);
+        const baseDataset = `data-online-since="${escapeHtml(onlineSinceRaw)}" data-offline-since="${escapeHtml(offlineSinceRaw)}" data-state-changed-at="${escapeHtml(stateChangedRaw)}"`;
 
         if (state === "online") {
-          return `<div>Online since: <strong>${onlineSince}</strong></div><div class="muted">Last change: ${stateChangedAt}</div>`;
+          return `<div>Online: <strong data-live-timer="true" data-timer-kind="online" data-start-ts="${escapeHtml(onlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Last change: ${stateChangedAt}</div>`;
         }
         if (state === "idle") {
-          return `<div>Online since: <strong>${onlineSince}</strong></div><div class="muted">Idle since: ${stateChangedAt}</div>`;
+          return `<div>Online: <strong data-live-timer="true" data-timer-kind="idle" data-start-ts="${escapeHtml(onlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Idle since: ${stateChangedAt}</div>`;
         }
         if (state === "offline") {
-          return `<div>Offline since: <strong>${offlineSince}</strong></div>`;
+          return `<div>Offline: <strong data-live-timer="true" data-timer-kind="offline" data-start-ts="${escapeHtml(offlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Since: ${offlineSince}</div>`;
         }
-        return `<div>Last change: <strong>${stateChangedAt}</strong></div>`;
+        return `<div>Last change: <strong data-live-timer="true" data-timer-kind="last-change" data-start-ts="${escapeHtml(stateChangedRaw)}" ${baseDataset}>-</strong></div><div class="muted">At: ${stateChangedAt}</div>`;
+      };
+
+      const buildTimerTitle = (element) => {
+        const kind = String(element.dataset.timerKind || "").trim();
+        const onlineSince = fmtClock(element.dataset.onlineSince);
+        const offlineSince = fmtClock(element.dataset.offlineSince);
+        const stateChangedAt = fmtClock(element.dataset.stateChangedAt);
+
+        if (kind === "online") {
+          return `Online since: ${onlineSince}`;
+        }
+        if (kind === "idle") {
+          return `Online since: ${onlineSince}\nIdle since: ${stateChangedAt}`;
+        }
+        if (kind === "offline") {
+          return `Offline since: ${offlineSince}`;
+        }
+        return `Last change: ${stateChangedAt}`;
+      };
+
+      const updateLiveTimers = () => {
+        const nowMs = Date.now();
+        document.querySelectorAll("[data-live-timer='true']").forEach((element) => {
+          const startMs = parseTimestampMs(element.dataset.startTs);
+          if (startMs === null) {
+            element.textContent = "-";
+            element.title = buildTimerTitle(element);
+            return;
+          }
+
+          element.textContent = fmtRelativeTimer(startMs, nowMs);
+          element.title = buildTimerTitle(element);
+        });
       };
 
       const renderDevices = (items) => {
         if (!items.length) {
           devicesTable.innerHTML = '<tr><td class="empty" colspan="6">No devices found</td></tr>';
+          updateLiveTimers();
           return;
         }
 
@@ -718,6 +774,7 @@
             `;
           })
           .join("");
+        updateLiveTimers();
       };
 
       const loadDevices = async () => {
@@ -755,6 +812,8 @@
       sortRows();
       setCounts();
       reconfigureAutoRefresh();
+      updateLiveTimers();
+      setInterval(updateLiveTimers, 1000);
     </script>
   </body>
 </html>
