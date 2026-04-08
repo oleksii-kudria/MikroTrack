@@ -53,8 +53,15 @@ class MikroTikClient:
             self.logger.info("Connected to MikroTik API")
             self.logger.debug("RouterOS API session initialized")
         except Exception as error:
+            wrapped_error = to_mikrotrack_error(error)
+            self.logger.error(
+                "MikroTik connection failed: %s %s:%s",
+                wrapped_error.error_code,
+                self.host,
+                self.port,
+            )
             self.disconnect()
-            raise to_mikrotrack_error(error) from error
+            raise wrapped_error from error
 
     def disconnect(self) -> None:
         if self._connection is None:

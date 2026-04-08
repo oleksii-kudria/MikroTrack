@@ -177,3 +177,5 @@ Expected:
 - Replace `StrongPassword` with a secure password
 - Replace `192.168.36.100` with your server IP
 - Ensure firewall allows access to port 8729
+- If you see `access_denied`, verify `/ip service api-ssl address` includes collector IP
+- If you see `authentication_failed`, verify user credentials and policy (`read,api`)
