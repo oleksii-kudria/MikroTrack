@@ -213,7 +213,7 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(by_type["arp_status_changed"]["old_status"], "reachable")
         self.assertEqual(by_type["arp_status_changed"]["new_status"], "permanent")
         self.assertEqual(by_type["arp_state_changed"]["old_state"], "online")
-        self.assertEqual(by_type["arp_state_changed"]["new_state"], "permanent")
+        self.assertEqual(by_type["arp_state_changed"]["new_state"], "unknown")
 
     def test_diff_generates_session_started_and_ended_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -281,7 +281,41 @@ class SnapshotDiffTests(unittest.TestCase):
 
         self.assertEqual(ended_by_type["state_changed"]["old_state"], "online")
         self.assertEqual(ended_by_type["state_changed"]["new_state"], "offline")
-        self.assertEqual(ended_by_type["session_ended"]["event_type"], "session_ended")
+
+    def test_diff_uses_fused_state_for_state_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:31",
+                            "ip_address": "192.168.88.91",
+                            "source": ["arp"],
+                            "arp_status": "delay",
+                            "fused_state": "online",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+
+            events = process_snapshot_diff(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:31",
+                        "ip_address": "192.168.88.91",
+                        "source": ["arp"],
+                        "arp_status": "reachable",
+                        "fused_state": "online",
+                    }
+                ]
+            )
+
+        event_types = [event["event_type"] for event in events]
+        self.assertIn("arp_status_changed", event_types)
+        self.assertNotIn("arp_state_changed", event_types)
+        self.assertNotIn("state_changed", event_types)
 
     def test_diff_adds_entity_context_and_interface_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

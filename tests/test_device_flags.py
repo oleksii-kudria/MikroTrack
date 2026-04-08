@@ -40,7 +40,7 @@ class DeviceFlagRenderingTests(unittest.TestCase):
     def test_device_state_uses_arp_status_as_source_of_truth(self) -> None:
         self.assertEqual(_device_state({"arp_status": "failed"}), "offline")
         self.assertEqual(_device_state({"arp_status": "reachable"}), "online")
-        self.assertEqual(_device_state({"arp_status": "probe"}), "idle")
+        self.assertEqual(_device_state({"arp_status": "probe"}), "online")
         self.assertEqual(_device_state({"arp_status": "stale"}), "idle")
         self.assertEqual(_device_state({"arp_status": "permanent", "bridge_host_present": True}), "online")
         self.assertEqual(_device_state({"arp_status": "permanent"}), "unknown")

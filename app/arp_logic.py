@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-_IDLE_ARP_STATUSES = {"stale", "delay", "probe"}
+_IDLE_ARP_STATUSES = {"stale"}
 _OFFLINE_ARP_STATUSES = {"failed", "incomplete"}
-_ONLINE_ARP_STATUSES = {"reachable", "complete"}
+_ONLINE_ARP_STATUSES = {"reachable", "complete", "delay", "probe"}
 
 
 def normalize_arp_status(raw_status: Any) -> str:
@@ -29,7 +29,7 @@ def arp_state_from_status(raw_status: Any) -> str:
 def fused_device_state(raw_status: Any, bridge_host_present: bool) -> str:
     status = normalize_arp_status(raw_status)
 
-    if status == "reachable":
+    if status in _ONLINE_ARP_STATUSES:
         return "online"
     if bridge_host_present:
         return "online"
