@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
-from app.arp_logic import arp_state_from_status, normalize_arp_status
+from app.arp_logic import fused_device_state, normalize_arp_status
 
 app = FastAPI(title="MikroTrack API", version="0.1.0")
 
@@ -125,13 +125,20 @@ def _is_link_local(ip_raw: str) -> bool:
 def _device_state(device: dict[str, Any]) -> str:
     arp_status_raw = normalize_arp_status(device.get("arp_status", ""))
     arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
+    bridge_host_present = bool(device.get("bridge_host_present", False))
+    evidence = device.get("evidence")
+    if not bridge_host_present and isinstance(evidence, dict):
+        bridge_host_present = bool(evidence.get("bridge_host_present", False))
     dhcp_status = str(device.get("dhcp_status", "")).strip().lower()
 
     if bool(arp_flags.get("disabled")) or bool(arp_flags.get("invalid")):
         return "offline"
 
     if arp_status_raw and arp_status_raw != "unknown":
-        return arp_state_from_status(arp_status_raw)
+        return fused_device_state(arp_status_raw, bridge_host_present)
+
+    if bridge_host_present:
+        return "online"
 
     # Fallback path when ARP status is absent in historical/legacy snapshots.
     if dhcp_status == "bound":

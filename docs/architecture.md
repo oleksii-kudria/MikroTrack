@@ -9,7 +9,7 @@ MikroTrack зараз працює як **collector-сервіс** із JSON sna
 Відповідальність:
 
 - підключення до MikroTik через RouterOS API (SSL)
-- збір DHCP leases та ARP entries
+- збір DHCP leases, ARP entries та Bridge Host entries
 - нормалізація і обʼєднання у unified device model
 - вивід результату у логи/stdout
 - збереження snapshot у JSON (за потреби)
@@ -49,7 +49,7 @@ MikroTrack currently runs as a **collector service** with JSON snapshots.
 Responsibilities:
 
 - connect to MikroTik via RouterOS API (SSL)
-- collect DHCP leases and ARP entries
+- collect DHCP leases, ARP entries, and Bridge Host entries
 - normalize and merge data into a unified device model
 - output data to logs/stdout
 - persist snapshots to JSON (optional)

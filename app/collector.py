@@ -102,3 +102,38 @@ def get_arp_entries(client: MikroTikClient) -> list[dict[str, Any]]:
     logger.info("ARP enriched records count: %d", len(normalized))
     logger.debug("ARP enriched record sample: %s", normalized[0] if normalized else {})
     return normalized
+
+
+def get_bridge_hosts(client: MikroTikClient) -> list[dict[str, Any]]:
+    logger.info("Requesting bridge host entries from MikroTik API")
+    logger.debug("Executing API call: /interface/bridge/host get()")
+
+    try:
+        bridge_host_resource = client.get_resource("/interface/bridge/host")
+        bridge_hosts = bridge_host_resource.get()
+    except Exception as error:
+        raise UnexpectedMikroTikResponseError("Failed to fetch bridge host entries") from error
+
+    if not isinstance(bridge_hosts, list):
+        raise UnexpectedMikroTikResponseError("Bridge host response is not a list")
+
+    logger.info("Bridge host entries fetched: %d", len(bridge_hosts))
+
+    normalized: list[dict[str, Any]] = []
+    for index, entry in enumerate(bridge_hosts):
+        if not isinstance(entry, dict):
+            raise UnexpectedMikroTikResponseError("Bridge host item is not a dictionary")
+
+        logger.debug("Normalizing bridge host entry #%d", index + 1)
+        normalized.append(
+            {
+                "mac_address": entry.get("mac-address", ""),
+                "interface": entry.get("interface", ""),
+                "bridge_host_last_seen": entry.get("last-seen", ""),
+                "bridge_host_present": True,
+            }
+        )
+
+    logger.info("Bridge host enriched records count: %d", len(normalized))
+    logger.debug("Bridge host enriched record sample: %s", normalized[0] if normalized else {})
+    return normalized
