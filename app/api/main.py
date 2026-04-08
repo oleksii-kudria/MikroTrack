@@ -61,6 +61,41 @@ def _parse_ts(value: str | None) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+def _presence_state(state: str | None) -> str:
+    normalized = str(state or "").strip().lower()
+    return normalized if normalized in {"online", "idle", "offline"} else "unknown"
+
+
+def _sanitize_presence_transition(previous_state: str, current_state: str) -> tuple[str, str]:
+    prev = _presence_state(previous_state)
+    curr = _presence_state(current_state)
+    if prev == "offline" and curr == "idle":
+        curr = "online"
+    return prev, curr
+
+
+def _extract_state_transition(event: dict[str, Any]) -> tuple[str, str] | None:
+    event_type = str(event.get("event_type", "")).strip().lower()
+
+    if event_type == "state_changed":
+        old_state = str(event.get("old_state", event.get("old_value", "")))
+        new_state = str(event.get("new_state", event.get("new_value", "")))
+        prev, curr = _sanitize_presence_transition(old_state, new_state)
+        if prev == "unknown" or curr == "unknown":
+            return None
+        return prev, curr
+
+    if event_type == "arp_state_changed":
+        old_state = str(event.get("old_state", event.get("old_value", "")))
+        new_state = str(event.get("new_state", event.get("new_value", "")))
+        prev, curr = _sanitize_presence_transition(old_state, new_state)
+        if prev == "unknown" or curr == "unknown":
+            return None
+        return prev, curr
+
+    return None
+
+
 def _read_events(limit: int = 10000) -> list[dict[str, Any]]:
     events_file = _persistence_path() / "events.jsonl"
     if not events_file.exists():
@@ -223,17 +258,34 @@ def list_devices() -> dict[str, object]:
 
     now = datetime.now(UTC)
     events = _read_events()
-    last_change_by_mac: dict[str, datetime] = {}
+    session_by_mac: dict[str, dict[str, datetime | None]] = {}
 
-    for event in events:
+    sorted_events = sorted(events, key=lambda event: _parse_ts(str(event.get("timestamp", ""))) or datetime.min.replace(tzinfo=UTC))
+    for event in sorted_events:
         mac = str(event.get("mac", "")).strip()
         timestamp = _parse_ts(str(event.get("timestamp", "")))
-        if not mac or timestamp is None:
+        transition = _extract_state_transition(event)
+        if not mac or timestamp is None or transition is None:
             continue
 
-        previous = last_change_by_mac.get(mac)
-        if previous is None or timestamp > previous:
-            last_change_by_mac[mac] = timestamp
+        previous_state, current_state = transition
+        session = session_by_mac.setdefault(
+            mac,
+            {
+                "state_changed_at": None,
+                "online_since": None,
+                "offline_since": None,
+            },
+        )
+        session["state_changed_at"] = timestamp
+
+        if current_state in {"online", "idle"}:
+            if previous_state not in {"online", "idle"} or session["online_since"] is None:
+                session["online_since"] = timestamp
+            session["offline_since"] = None
+        elif current_state == "offline":
+            session["offline_since"] = timestamp
+            session["online_since"] = None
 
     snapshot_ts = datetime.fromtimestamp(snapshot_mtime, tz=UTC)
     items: list[dict[str, Any]] = []
@@ -243,8 +295,6 @@ def list_devices() -> dict[str, object]:
             continue
 
         mac = str(device.get("mac_address", ""))
-        last_change = last_change_by_mac.get(mac, snapshot_ts)
-        elapsed_seconds = max(0, int((now - last_change).total_seconds()))
         dhcp_flags = device.get("dhcp_flags") if isinstance(device.get("dhcp_flags"), dict) else {}
         arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
         source = device.get("source")
@@ -275,6 +325,35 @@ def list_devices() -> dict[str, object]:
         badges = [str(value).strip().upper() for value in device.get("badges", []) if str(value).strip()]
         entity_type = str(device.get("entity_type", "client")).strip().lower() or "client"
         interface_name = str(device.get("interface_name", "")).strip()
+        session = session_by_mac.get(mac, {})
+
+        state_changed_at = session.get("state_changed_at") if isinstance(session, dict) else None
+        online_since = session.get("online_since") if isinstance(session, dict) else None
+        offline_since = session.get("offline_since") if isinstance(session, dict) else None
+
+        if not isinstance(state_changed_at, datetime):
+            state_changed_at = snapshot_ts
+        if device_state in {"online", "idle"} and not isinstance(online_since, datetime):
+            online_since = snapshot_ts
+        if device_state == "offline" and not isinstance(offline_since, datetime):
+            offline_since = snapshot_ts
+
+        presence_duration_seconds = (
+            max(0, int((now - online_since).total_seconds()))
+            if device_state in {"online", "idle"} and isinstance(online_since, datetime)
+            else None
+        )
+        offline_duration_seconds = (
+            max(0, int((now - offline_since).total_seconds()))
+            if device_state == "offline" and isinstance(offline_since, datetime)
+            else None
+        )
+        idle_duration_seconds = (
+            max(0, int((now - state_changed_at).total_seconds()))
+            if device_state == "idle" and isinstance(state_changed_at, datetime)
+            else None
+        )
+        elapsed_seconds = presence_duration_seconds or offline_duration_seconds or 0
 
         items.append(
             {
@@ -309,7 +388,13 @@ def list_devices() -> dict[str, object]:
                 "entity_type": entity_type,
                 "interface_name": interface_name,
                 "active": active,
-                "last_change": last_change.isoformat(),
+                "last_change": state_changed_at.isoformat(),
+                "state_changed_at": state_changed_at.isoformat(),
+                "online_since": online_since.isoformat() if isinstance(online_since, datetime) else None,
+                "offline_since": offline_since.isoformat() if isinstance(offline_since, datetime) else None,
+                "presence_duration_seconds": presence_duration_seconds,
+                "offline_duration_seconds": offline_duration_seconds,
+                "idle_duration_seconds": idle_duration_seconds,
                 "elapsed_seconds": elapsed_seconds,
             }
         )

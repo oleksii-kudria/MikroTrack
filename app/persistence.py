@@ -238,6 +238,23 @@ def _state_reason(state: str, arp_status: str, bridge_host_present: bool) -> str
     return "no_evidence"
 
 
+def _normalized_presence_state(state: str) -> str:
+    normalized = str(state).strip().lower()
+    return normalized if normalized in {"online", "idle", "offline"} else "unknown"
+
+
+def _sanitize_presence_transition(previous_state: str, current_state: str) -> tuple[str, str]:
+    prev = _normalized_presence_state(previous_state)
+    curr = _normalized_presence_state(current_state)
+
+    # Idle is a sub-state of the online presence session.
+    # Transition offline -> idle is invalid and must become a new online session.
+    if prev == "offline" and curr == "idle":
+        curr = "online"
+
+    return prev, curr
+
+
 def _append_events(events: list[Event]) -> None:
     if not events:
         return
@@ -501,6 +518,48 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                 device_event.update(_event_context(current))
                 events.append(device_event)
                 _log_event(device_event)
+
+            previous_presence_state, current_presence_state = _sanitize_presence_transition(
+                previous_arp_state,
+                current_arp_state,
+            )
+            if previous_presence_state != "unknown" and current_presence_state != "unknown":
+                state_changed_event = {
+                    "timestamp": _iso_timestamp(),
+                    "event_type": "state_changed",
+                    "type": "state_changed",
+                    "mac": mac,
+                    "old_state": previous_presence_state,
+                    "new_state": current_presence_state,
+                    "old_value": previous_presence_state,
+                    "new_value": current_presence_state,
+                }
+                state_changed_event.update(_event_context(current))
+                events.append(state_changed_event)
+                _log_event(state_changed_event)
+
+                if previous_presence_state == "offline" and current_presence_state in {"online", "idle"}:
+                    session_started_event = {
+                        "timestamp": _iso_timestamp(),
+                        "event_type": "session_started",
+                        "type": "session_started",
+                        "mac": mac,
+                        "new_state": current_presence_state,
+                    }
+                    session_started_event.update(_event_context(current))
+                    events.append(session_started_event)
+                    _log_event(session_started_event)
+                elif previous_presence_state in {"online", "idle"} and current_presence_state == "offline":
+                    session_ended_event = {
+                        "timestamp": _iso_timestamp(),
+                        "event_type": "session_ended",
+                        "type": "session_ended",
+                        "mac": mac,
+                        "old_state": previous_presence_state,
+                    }
+                    session_ended_event.update(_event_context(current))
+                    events.append(session_ended_event)
+                    _log_event(session_ended_event)
 
         previous_evidence = {
             "arp_status": previous_arp_status,
