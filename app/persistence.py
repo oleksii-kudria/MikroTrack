@@ -271,6 +271,26 @@ def _derive_device_state(device: dict[str, Any]) -> str:
     return _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
 
 
+def _has_presence_evidence(device: dict[str, Any]) -> bool:
+    bridge_host_present = bool(device.get("bridge_host_present", False))
+    evidence = device.get("evidence")
+    if not bridge_host_present and isinstance(evidence, dict):
+        bridge_host_present = bool(evidence.get("bridge_host_present", False))
+    if bridge_host_present:
+        return True
+
+    arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
+    if arp_status in {"reachable", "delay"}:
+        return True
+
+    if isinstance(evidence, dict):
+        evidence_arp_status = normalize_arp_status(evidence.get("arp_status", "unknown"))
+        if evidence_arp_status in {"reachable", "delay"}:
+            return True
+
+    return False
+
+
 def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
     previous_snapshot_path = _latest_snapshot_path()
     previous_devices: list[dict[str, Any]] = []
@@ -296,6 +316,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous = previous_by_mac.get(mac)
         current_state = _derive_device_state(current)
         device = dict(current)
+        device.setdefault("state_changed_at", None)
+        device.setdefault("online_since", None)
+        device.setdefault("offline_since", None)
 
         if previous is None:
             if current_state in {"online", "idle"}:
@@ -306,21 +329,31 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 device["state_changed_at"] = now_iso
                 device["offline_since"] = now_iso
                 device["online_since"] = None
+            else:
+                device["state_changed_at"] = None
+                device["online_since"] = None
+                device["offline_since"] = None
             enriched_devices.append(device)
             continue
 
         previous_state = _derive_device_state(previous)
-        previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, current_state)
+        merge_current_state = current_state
+        decision = "apply_transition_rules"
+        if current_state == "unknown" and _has_presence_evidence(device):
+            merge_current_state = previous_state
+            decision = "unknown_with_evidence_preserved_previous_state"
+
+        previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, merge_current_state)
         previous_state_changed_at = previous.get("state_changed_at")
         previous_online_since = previous.get("online_since")
         previous_offline_since = previous.get("offline_since")
 
-        if previous_state == current_state:
+        if previous_state == merge_current_state:
             device["state_changed_at"] = previous_state_changed_at
-            if current_state in {"online", "idle"}:
+            if merge_current_state in {"online", "idle"}:
                 device["online_since"] = previous_online_since
                 device["offline_since"] = None
-            elif current_state == "offline":
+            elif merge_current_state == "offline":
                 device["online_since"] = None
                 device["offline_since"] = previous_offline_since
             else:
@@ -329,7 +362,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s "
                 "old_online_since=%s new_online_since=%s "
-                "old_offline_since=%s new_offline_since=%s decision=keep_existing_timestamps",
+                "old_offline_since=%s new_offline_since=%s decision=%s",
                 mac,
                 previous_state,
                 current_state,
@@ -337,6 +370,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 device.get("online_since"),
                 previous_offline_since,
                 device.get("offline_since"),
+                "preserved",
             )
             enriched_devices.append(device)
             continue
@@ -367,7 +401,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         logger.debug(
             "state timestamp merge: mac=%s old_state=%s new_state=%s "
             "old_online_since=%s new_online_since=%s "
-            "old_offline_since=%s new_offline_since=%s decision=apply_transition_rules",
+            "old_offline_since=%s new_offline_since=%s decision=%s",
             mac,
             previous_state,
             current_state,
@@ -375,6 +409,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device.get("online_since"),
             previous_offline_since,
             device.get("offline_since"),
+            decision,
         )
         enriched_devices.append(device)
 
