@@ -204,18 +204,6 @@
         gap: 6px;
       }
 
-      .flags-inline {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        flex-wrap: nowrap;
-      }
-
-      .flags-separator {
-        color: var(--muted);
-        font-size: 0.85rem;
-      }
-
       .badge-blue {
         background: #dbeafe;
         color: #1d4ed8;
@@ -430,7 +418,7 @@
                 <th>IP</th>
                 <th>Hostname</th>
                 <th>Comments</th>
-                <th>Flags / state</th>
+                <th>Assignment</th>
                 <th>Session / state time</th>
               </tr>
             </thead>
@@ -589,37 +577,27 @@
       const badge = (label, cssClass, tooltip) =>
         `<span class="badge ${cssClass}" title="${escapeHtml(tooltip || label)}">${escapeHtml(label)}</span>`;
 
-      const buildFlagsBadges = (flags) => {
-        const hasDhcpLease = Boolean(flags.has_dhcp_lease);
-        const hasArpEntry = Boolean(flags.has_arp_entry);
-        const dhcpFlagRaw = flags.dhcp_flag;
-        const dhcpFlag = dhcpFlagRaw ? String(dhcpFlagRaw).toUpperCase() : "";
-        const arpFlagRaw = flags.arp_flag;
-        const arpFlag = arpFlagRaw ? String(arpFlagRaw).toUpperCase() : "";
-
-        const dhcpTooltip = dhcpFlag === "D" ? "DHCP D = DHCP dynamic" : "DHCP S = DHCP static";
-
-        const arpTooltipMap = {
-          D: "ARP D = ARP dynamic",
-          C: "ARP C = ARP complete",
-          DC: "ARP DC = ARP dynamic + complete",
-          SC: "ARP SC = ARP static + complete",
-          S: "ARP S = ARP static",
-        };
-        const arpTooltip = arpTooltipMap[arpFlag] || `ARP ${arpFlag}`;
-
-        if (!hasArpEntry || !arpFlag) {
-          if (!hasDhcpLease || !dhcpFlag) {
-            return `<div class="flags-inline"><span class="badge badge-gray" title="No DHCP/ARP assignment flags">-</span></div>`;
-          }
-          return `<div class="flags-inline">${badge(dhcpFlag, "badge-blue", dhcpTooltip)}</div>`;
+      const buildSemanticAssignmentBadge = (item) => {
+        const entityType = String(item.entity_type || "client").trim().toLowerCase();
+        const interfaceName = String(item.interface_name || "").trim();
+        if (entityType === "interface") {
+          const nameHtml = interfaceName ? ` <span class="badge badge-gray" title="Interface name">${escapeHtml(interfaceName)}</span>` : "";
+          return `${badge("INTERFACE", "badge-purple", "Local MikroTik interface MAC")}${nameHtml}`;
         }
 
-        if (!hasDhcpLease || !dhcpFlag) {
-          return `<div class="flags-inline">${badge(arpFlag, "badge-purple", arpTooltip)}</div>`;
-        }
+        const flags = item.flags || {};
+        const arpFlag = String(flags.arp_flag || "").trim().toUpperCase();
+        const dhcpFlag = String(flags.dhcp_flag || "").trim().toUpperCase();
+        const arpIsStatic = arpFlag.startsWith("S");
+        const dhcpIsStatic = dhcpFlag === "S";
 
-        return `<div class="flags-inline">${badge(dhcpFlag, "badge-blue", dhcpTooltip)}<span class="flags-separator">|</span>${badge(arpFlag, "badge-purple", arpTooltip)}</div>`;
+        if (arpIsStatic) {
+          return badge("PERM", "badge-purple", "Pinned device");
+        }
+        if (dhcpIsStatic) {
+          return badge("STATIC", "badge-blue", "Reserved client");
+        }
+        return badge("DYNAMIC", "badge-gray", "Dynamic client");
       };
 
       const buildCommentBadges = (item) => {
@@ -655,27 +633,7 @@
               : "status-unknown";
         const rawArpStatus = String(item.arp_status || "").trim();
         const tooltip = rawArpStatus ? `${state} (arp status: ${rawArpStatus})` : state;
-        const badgeHtml = (Array.isArray(item.badges) ? item.badges : [])
-          .map((value) => {
-            const badgeValue = String(value || "").trim().toUpperCase();
-            if (!badgeValue) {
-              return "";
-            }
-            if (badgeValue === "PERM") {
-              return `<span class="badge badge-gray" title="Static ARP entry">PERM</span>`;
-            }
-            if (badgeValue === "INTERFACE") {
-              return `<span class="badge badge-purple" title="Local MikroTik interface MAC">INTERFACE</span>`;
-            }
-            if (badgeValue === "LINK-LOCAL") {
-              return `<span class="badge badge-orange" title="APIPA / link-local IP address">LINK-LOCAL</span>`;
-            }
-            return `<span class="badge badge-gray">${escapeHtml(badgeValue)}</span>`;
-          })
-          .join("");
-        const interfaceName = String(item.interface_name || "").trim();
-        const interfaceLabel = interfaceName ? `<span class="badge badge-gray" title="Interface name">${escapeHtml(interfaceName)}</span>` : "";
-        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code>${badgeHtml}${interfaceLabel}</span>`;
+        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
       };
 
       const buildIpCell = (item) => {
@@ -761,14 +719,13 @@
 
         devicesTable.innerHTML = items
           .map((item) => {
-            const flags = item.flags || {};
             return `
               <tr>
                 <td>${buildStatusMac(item)}</td>
                 <td>${buildIpCell(item)}</td>
                 <td>${item.hostname || "-"}</td>
                 <td>${buildCommentBadges(item)}</td>
-                <td>${buildFlagsBadges(flags)}</td>
+                <td>${buildSemanticAssignmentBadge(item)}</td>
                 <td>${buildSessionCell(item)}</td>
               </tr>
             `;
