@@ -432,7 +432,7 @@ class SnapshotDiffTests(unittest.TestCase):
     def test_save_snapshot_unknown_with_presence_evidence_keeps_previous_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
-            Path(tmp, "2026-04-08T16-00-00.json").write_text(
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
                 json.dumps(
                     [
                         {
@@ -468,6 +468,86 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(snapshot["state_changed_at"], "2026-04-08T15:00:00+00:00")
         self.assertEqual(snapshot["online_since"], "2026-04-08T15:00:00+00:00")
         self.assertIsNone(snapshot["offline_since"])
+
+    def test_save_snapshot_unchanged_online_initializes_missing_session_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:45",
+                            "ip_address": "192.168.88.45",
+                            "source": ["dhcp", "arp", "bridge_host"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "state_changed_at": None,
+                            "online_since": None,
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:45",
+                        "ip_address": "192.168.88.45",
+                        "source": ["dhcp", "arp", "bridge_host"],
+                        "arp_status": "reachable",
+                        "arp_state": "online",
+                        "bridge_host_present": True,
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertIsNotNone(snapshot["state_changed_at"])
+        self.assertIsNotNone(snapshot["online_since"])
+        self.assertIsNone(snapshot["offline_since"])
+
+    def test_save_snapshot_unchanged_offline_initializes_missing_session_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:46",
+                            "ip_address": "192.168.88.46",
+                            "source": ["dhcp", "arp", "bridge_host"],
+                            "arp_status": "failed",
+                            "arp_state": "offline",
+                            "state_changed_at": None,
+                            "online_since": None,
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:46",
+                        "ip_address": "192.168.88.46",
+                        "source": ["dhcp", "arp", "bridge_host"],
+                        "arp_status": "failed",
+                        "arp_state": "offline",
+                        "bridge_host_present": False,
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertIsNotNone(snapshot["state_changed_at"])
+        self.assertIsNotNone(snapshot["offline_since"])
+        self.assertIsNone(snapshot["online_since"])
 
 
 if __name__ == "__main__":
