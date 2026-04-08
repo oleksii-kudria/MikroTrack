@@ -588,16 +588,26 @@
         const flags = item.flags || {};
         const arpFlag = String(flags.arp_flag || "").trim().toUpperCase();
         const dhcpFlag = String(flags.dhcp_flag || "").trim().toUpperCase();
+        const hasDhcpLease = Boolean(dhcpFlag);
+        const dhcpIsDynamic = dhcpFlag === "D";
         const arpIsStatic = arpFlag.startsWith("S");
         const dhcpIsStatic = dhcpFlag === "S";
 
         if (arpIsStatic) {
           return badge("PERM", "badge-purple", "Pinned device");
         }
-        if (dhcpIsStatic) {
+        if (hasDhcpLease && dhcpIsStatic) {
           return badge("STATIC", "badge-blue", "Reserved client");
         }
-        return badge("DYNAMIC", "badge-gray", "Dynamic client");
+        if (hasDhcpLease && dhcpIsDynamic) {
+          return badge("DYNAMIC", "badge-gray", "Dynamic client");
+        }
+
+        if (!hasDhcpLease && arpFlag === "DC") {
+          return badge("COMPLETE", "badge-green", "Complete ARP record without DHCP lease");
+        }
+
+        return "";
       };
 
       const buildCommentBadges = (item) => {
