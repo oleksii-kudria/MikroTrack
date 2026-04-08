@@ -272,6 +272,9 @@ def list_devices() -> dict[str, object]:
         arp_state = str(device.get("arp_state", "")).strip().lower() or device_state
         primary_ip = str(device.get("ip_address", ""))
         arp_secondary = device.get("arp_secondary") if isinstance(device.get("arp_secondary"), list) else []
+        badges = [str(value).strip().upper() for value in device.get("badges", []) if str(value).strip()]
+        entity_type = str(device.get("entity_type", "client")).strip().lower() or "client"
+        interface_name = str(device.get("interface_name", "")).strip()
 
         items.append(
             {
@@ -302,6 +305,9 @@ def list_devices() -> dict[str, object]:
                 "arp_state": arp_state,
                 "arp_secondary_count": len(arp_secondary),
                 "arp_secondary": arp_secondary,
+                "badges": badges,
+                "entity_type": entity_type,
+                "interface_name": interface_name,
                 "active": active,
                 "last_change": last_change.isoformat(),
                 "elapsed_seconds": elapsed_seconds,

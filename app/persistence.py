@@ -150,10 +150,24 @@ def _get_nested_flag(device: dict[str, Any], container_key: str, flag_key: str) 
     return bool(container.get(flag_key, False))
 
 
+def _event_context(device: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(device, dict):
+        return {}
+    context: dict[str, Any] = {}
+    entity_type = str(device.get("entity_type", "")).strip().lower()
+    if entity_type:
+        context["entity_type"] = entity_type
+    interface_name = str(device.get("interface_name", "")).strip()
+    if interface_name:
+        context["interface_name"] = interface_name
+    return context
+
+
 def _build_event(
     event_type: str,
     mac: str,
     *,
+    device: dict[str, Any] | None = None,
     old_value: Any | None = None,
     new_value: Any | None = None,
 ) -> Event:
@@ -162,6 +176,7 @@ def _build_event(
         "event_type": event_type,
         "mac": mac,
     }
+    event.update(_event_context(device))
     if old_value is not None:
         event["old_value"] = old_value
     if new_value is not None:
@@ -184,12 +199,13 @@ def _build_arp_transition_event(
     event_type: str,
     mac: str,
     *,
+    device: dict[str, Any] | None = None,
     old_key: str,
     new_key: str,
     old_value: str,
     new_value: str,
 ) -> Event:
-    return {
+    event = {
         "timestamp": _iso_timestamp(),
         "event_type": event_type,
         "type": event_type,
@@ -199,6 +215,8 @@ def _build_arp_transition_event(
         "old_value": old_value,
         "new_value": new_value,
     }
+    event.update(_event_context(device))
+    return event
 
 
 def _online_reason(arp_status: str, bridge_host_present: bool) -> str:
@@ -250,9 +268,28 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                 current.get("ip_address", ""),
                 mac,
             )
-            event = _build_event("NEW_DEVICE", mac)
+            event = _build_event("NEW_DEVICE", mac, device=current)
             events.append(event)
             _log_event(event)
+            current_entity_type = str(current.get("entity_type", "")).strip().lower()
+            if current_entity_type:
+                entity_event = _build_event(
+                    "entity_type_detected",
+                    mac,
+                    device=current,
+                    new_value=current_entity_type,
+                )
+                events.append(entity_event)
+                _log_event(entity_event)
+            if current_entity_type == "interface":
+                interface_event = _build_event(
+                    "interface_detected",
+                    mac,
+                    device=current,
+                    new_value=str(current.get("interface_name", "")).strip(),
+                )
+                events.append(interface_event)
+                _log_event(interface_event)
             continue
 
         previous_ip = str(previous.get("ip_address", ""))
@@ -260,7 +297,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
         if previous_ip != current_ip:
             changed_count += 1
             logger.debug("[IP_CHANGED] Device IP changed: %s %s -> %s", mac, previous_ip, current_ip)
-            event = _build_event("IP_CHANGED", mac, old_value=previous_ip, new_value=current_ip)
+            event = _build_event("IP_CHANGED", mac, device=current, old_value=previous_ip, new_value=current_ip)
             events.append(event)
             _log_event(event)
 
@@ -277,6 +314,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_event(
                 "HOSTNAME_CHANGED",
                 mac,
+                device=current,
                 old_value=previous_hostname,
                 new_value=current_hostname,
             )
@@ -288,13 +326,13 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
         if not previous_has_dhcp and current_has_dhcp:
             changed_count += 1
             logger.debug("[DHCP_ADDED] DHCP lease appeared")
-            event = _build_event("DHCP_ADDED", mac)
+            event = _build_event("DHCP_ADDED", mac, device=current)
             events.append(event)
             _log_event(event)
         elif previous_has_dhcp and not current_has_dhcp:
             changed_count += 1
             logger.debug("[DHCP_REMOVED] DHCP lease removed")
-            event = _build_event("DHCP_REMOVED", mac)
+            event = _build_event("DHCP_REMOVED", mac, device=current)
             events.append(event)
             _log_event(event)
 
@@ -310,6 +348,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_event(
                 "DHCP_DYNAMIC_CHANGED",
                 mac,
+                device=current,
                 old_value=previous_dhcp_dynamic,
                 new_value=current_dhcp_dynamic,
             )
@@ -326,6 +365,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_event(
                 "DEVICE_IP_ASSIGNMENT_CHANGED",
                 mac,
+                device=current,
                 old_value=assignment_old,
                 new_value=assignment_new,
             )
@@ -340,6 +380,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_event(
                 "DHCP_STATUS_CHANGED",
                 mac,
+                device=current,
                 old_value=previous_dhcp_status,
                 new_value=current_dhcp_status,
             )
@@ -354,6 +395,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_event(
                 "DHCP_COMMENT_CHANGED",
                 mac,
+                device=current,
                 old_value=previous_dhcp_comment,
                 new_value=current_dhcp_comment,
             )
@@ -365,13 +407,13 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
         if not previous_has_arp and current_has_arp:
             changed_count += 1
             logger.debug("[ARP_ADDED] ARP entry appeared")
-            event = _build_event("ARP_ADDED", mac)
+            event = _build_event("ARP_ADDED", mac, device=current)
             events.append(event)
             _log_event(event)
         elif previous_has_arp and not current_has_arp:
             changed_count += 1
             logger.debug("[ARP_REMOVED] ARP entry removed")
-            event = _build_event("ARP_REMOVED", mac)
+            event = _build_event("ARP_REMOVED", mac, device=current)
             events.append(event)
             _log_event(event)
 
@@ -383,6 +425,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_event(
                 "ARP_DYNAMIC_CHANGED",
                 mac,
+                device=current,
                 old_value=previous_arp_dynamic,
                 new_value=current_arp_dynamic,
             )
@@ -397,6 +440,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_event(
                 "ARP_FLAG_CHANGED",
                 mac,
+                device=current,
                 old_value=previous_arp_flags,
                 new_value=current_arp_flags,
             )
@@ -411,6 +455,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_arp_transition_event(
                 "arp_status_changed",
                 mac,
+                device=current,
                 old_key="old_status",
                 new_key="new_status",
                 old_value=previous_arp_status,
@@ -433,6 +478,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             event = _build_arp_transition_event(
                 "arp_state_changed",
                 mac,
+                device=current,
                 old_key="old_state",
                 new_key="new_state",
                 old_value=previous_arp_state,
@@ -452,6 +498,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                     "old_value": previous_arp_state,
                     "new_value": current_arp_state,
                 }
+                device_event.update(_event_context(current))
                 events.append(device_event)
                 _log_event(device_event)
 
@@ -470,6 +517,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             evidence_event = _build_event(
                 "evidence_changed",
                 mac,
+                device=current,
                 old_value=previous_evidence,
                 new_value=current_evidence,
             )
@@ -481,7 +529,35 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
         if previous_source != current_source:
             changed_count += 1
             logger.debug("[SOURCE_CHANGED] Device source changed: %s -> %s", previous_source, current_source)
-            event = _build_event("SOURCE_CHANGED", mac, old_value=previous_source, new_value=current_source)
+            event = _build_event("SOURCE_CHANGED", mac, device=current, old_value=previous_source, new_value=current_source)
+            events.append(event)
+            _log_event(event)
+
+        previous_entity_type = str(previous.get("entity_type", "")).strip().lower()
+        current_entity_type = str(current.get("entity_type", "")).strip().lower()
+        if previous_entity_type != current_entity_type and current_entity_type:
+            changed_count += 1
+            event = _build_event(
+                "entity_type_detected",
+                mac,
+                device=current,
+                old_value=previous_entity_type or "unknown",
+                new_value=current_entity_type,
+            )
+            events.append(event)
+            _log_event(event)
+
+        previous_interface_name = str(previous.get("interface_name", "")).strip()
+        current_interface_name = str(current.get("interface_name", "")).strip()
+        if current_entity_type == "interface" and previous_interface_name != current_interface_name:
+            changed_count += 1
+            event = _build_event(
+                "interface_detected",
+                mac,
+                device=current,
+                old_value=previous_interface_name,
+                new_value=current_interface_name,
+            )
             events.append(event)
             _log_event(event)
 
@@ -491,7 +567,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
 
         removed_count += 1
         logger.debug("[DEVICE_REMOVED] Device disappeared: %s (%s)", previous.get("ip_address", ""), mac)
-        event = _build_event("DEVICE_REMOVED", mac)
+        event = _build_event("DEVICE_REMOVED", mac, device=previous)
         events.append(event)
         _log_event(event)
 

@@ -137,3 +137,48 @@ def get_bridge_hosts(client: MikroTikClient) -> list[dict[str, Any]]:
     logger.info("Bridge host enriched records count: %d", len(normalized))
     logger.debug("Bridge host enriched record sample: %s", normalized[0] if normalized else {})
     return normalized
+
+
+def get_interface_macs(client: MikroTikClient) -> list[dict[str, str]]:
+    resources = (
+        ("/interface", "interface"),
+        ("/interface/bridge", "bridge"),
+        ("/interface/vlan", "vlan"),
+        ("/interface/wireless", "wireless"),
+    )
+    result_by_mac: dict[str, dict[str, str]] = {}
+
+    for path, source in resources:
+        logger.debug("Executing API call: %s get()", path)
+        try:
+            resource = client.get_resource(path)
+            entries = resource.get()
+        except Exception as error:
+            logger.warning("Failed to fetch %s entries: %s", path, error)
+            continue
+
+        if not isinstance(entries, list):
+            logger.warning("Unexpected response type for %s: %s", path, type(entries).__name__)
+            continue
+
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+
+            mac_address = str(entry.get("mac-address", "")).strip()
+            if not mac_address:
+                continue
+
+            if mac_address in result_by_mac:
+                continue
+
+            result_by_mac[mac_address] = {
+                "mac_address": mac_address,
+                "interface_name": str(entry.get("name", "")).strip(),
+                "interface_source": source,
+            }
+
+    result = list(result_by_mac.values())
+    logger.info("Interface MAC records fetched: %d", len(result))
+    logger.debug("Interface MAC sample: %s", result[:2])
+    return result

@@ -215,6 +215,41 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(by_type["arp_state_changed"]["old_state"], "online")
         self.assertEqual(by_type["arp_state_changed"]["new_state"], "permanent")
 
+    def test_diff_adds_entity_context_and_interface_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:20",
+                            "ip_address": "192.168.88.80",
+                            "source": ["arp"],
+                            "entity_type": "client",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+
+            events = process_snapshot_diff(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:20",
+                        "ip_address": "192.168.88.80",
+                        "source": ["arp"],
+                        "entity_type": "interface",
+                        "interface_name": "ether3",
+                    }
+                ]
+            )
+
+        by_type = {event["event_type"]: event for event in events}
+        self.assertEqual(by_type["entity_type_detected"]["new_value"], "interface")
+        self.assertEqual(by_type["interface_detected"]["new_value"], "ether3")
+        self.assertEqual(by_type["entity_type_detected"]["entity_type"], "interface")
+        self.assertEqual(by_type["interface_detected"]["interface_name"], "ether3")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

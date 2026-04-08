@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from app.api.main import _arp_flag, _device_state, _dhcp_flag
-from app.collector import get_arp_entries, get_bridge_hosts, get_dhcp_leases
+from app.collector import get_arp_entries, get_bridge_hosts, get_dhcp_leases, get_interface_macs
 from app.device_builder import build_devices
 
 
@@ -43,7 +43,7 @@ class DeviceFlagRenderingTests(unittest.TestCase):
         self.assertEqual(_device_state({"arp_status": "probe"}), "idle")
         self.assertEqual(_device_state({"arp_status": "stale"}), "idle")
         self.assertEqual(_device_state({"arp_status": "permanent", "bridge_host_present": True}), "online")
-        self.assertEqual(_device_state({"arp_status": "permanent"}), "permanent")
+        self.assertEqual(_device_state({"arp_status": "permanent"}), "unknown")
 
     def test_device_state_fallback_for_missing_arp_status(self) -> None:
         self.assertEqual(_device_state({"dhcp_status": "bound"}), "unknown")
@@ -111,6 +111,19 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertEqual(bridge_hosts[0]["interface"], "bridge1")
         self.assertEqual(bridge_hosts[0]["bridge_host_last_seen"], "12s")
         self.assertTrue(bridge_hosts[0]["bridge_host_present"])
+
+    def test_collector_parses_interface_macs(self) -> None:
+        client = _FakeClient(
+            {
+                "/interface": [{"name": "ether1", "mac-address": "AA"}],
+                "/interface/bridge": [{"name": "bridge1", "mac-address": "BB"}],
+                "/interface/vlan": [{"name": "vlan10", "mac-address": "CC"}],
+                "/interface/wireless": [{"name": "wlan1", "mac-address": "DD"}],
+            }
+        )
+        interface_macs = get_interface_macs(client)
+        self.assertEqual(len(interface_macs), 4)
+        self.assertEqual(interface_macs[0]["mac_address"], "AA")
 
     def test_builder_does_not_fake_dhcp_for_arp_only_device(self) -> None:
         devices = build_devices(
@@ -207,7 +220,8 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         )
 
         self.assertEqual(devices[0]["arp_status"], "permanent")
-        self.assertEqual(devices[0]["arp_state"], "permanent")
+        self.assertEqual(devices[0]["arp_state"], "unknown")
+        self.assertIn("PERM", devices[0]["badges"])
 
     def test_builder_promotes_permanent_to_online_when_bridge_host_present(self) -> None:
         devices = build_devices(
@@ -222,6 +236,18 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertEqual(devices[0]["arp_state"], "online")
         self.assertTrue(devices[0]["bridge_host_present"])
         self.assertIn("bridge_host", devices[0]["source"])
+        self.assertIn("PERM", devices[0]["badges"])
+
+    def test_builder_marks_interface_entity_and_name(self) -> None:
+        devices = build_devices(
+            dhcp=[],
+            arp=[{"mac_address": "AA", "ip_address": "192.168.88.12", "status": "reachable", "dynamic": False}],
+            interface_macs=[{"mac_address": "AA", "interface_name": "ether3"}],
+        )
+
+        self.assertEqual(devices[0]["entity_type"], "interface")
+        self.assertEqual(devices[0]["interface_name"], "ether3")
+        self.assertIn("INTERFACE", devices[0]["badges"])
 
 
 if __name__ == "__main__":

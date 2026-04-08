@@ -10,7 +10,7 @@ from types import FrameType
 
 import uvicorn
 
-from app.collector import get_arp_entries, get_bridge_hosts, get_dhcp_leases
+from app.collector import get_arp_entries, get_bridge_hosts, get_dhcp_leases, get_interface_macs
 from app.config import Config, load_config
 from app.device_builder import build_devices
 from app.errors import to_mikrotrack_error
@@ -48,12 +48,15 @@ def _run_once(config: Config, logger: logging.Logger) -> list[dict[str, object]]
         arp = get_arp_entries(client)
         logger.debug("Collecting bridge host entries")
         bridge_hosts = get_bridge_hosts(client)
+        logger.debug("Collecting local interface MAC entries")
+        interface_macs = get_interface_macs(client)
         logger.debug("Building devices from collected data")
-        devices = build_devices(dhcp, arp, bridge_hosts)
+        devices = build_devices(dhcp, arp, bridge_hosts, interface_macs)
 
     logger.info("Collected %d DHCP lease records", len(dhcp))
     logger.info("Collected %d ARP records", len(arp))
     logger.info("Collected %d bridge host records", len(bridge_hosts))
+    logger.info("Collected %d interface MAC records", len(interface_macs))
     logger.info("Built %d devices", len(devices))
 
     elapsed = time.monotonic() - cycle_started_at

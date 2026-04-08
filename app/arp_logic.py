@@ -37,6 +37,4 @@ def fused_device_state(raw_status: Any, bridge_host_present: bool) -> str:
         return "idle"
     if status in _OFFLINE_ARP_STATUSES:
         return "offline"
-    if status == "permanent":
-        return "permanent"
     return "unknown"

@@ -615,22 +615,37 @@
 
       const buildStatusMac = (item) => {
         const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
-        const state = ["online", "offline", "idle", "permanent", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+        const state = ["online", "offline", "idle", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
         const cls = state === "online"
           ? "status-active"
           : state === "offline"
             ? "status-inactive"
             : state === "idle"
               ? "status-idle"
-              : state === "permanent"
-                ? "status-permanent"
-                : "status-unknown";
+              : "status-unknown";
         const rawArpStatus = String(item.arp_status || "").trim();
         const tooltip = rawArpStatus ? `${state} (arp status: ${rawArpStatus})` : state;
-        const permanentBadge = state === "permanent"
-          ? `<span class="badge badge-gray" title="Static ARP entry">PERM</span>`
-          : "";
-        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code>${permanentBadge}</span>`;
+        const badgeHtml = (Array.isArray(item.badges) ? item.badges : [])
+          .map((value) => {
+            const badgeValue = String(value || "").trim().toUpperCase();
+            if (!badgeValue) {
+              return "";
+            }
+            if (badgeValue === "PERM") {
+              return `<span class="badge badge-gray" title="Static ARP entry">PERM</span>`;
+            }
+            if (badgeValue === "INTERFACE") {
+              return `<span class="badge badge-purple" title="Local MikroTik interface MAC">INTERFACE</span>`;
+            }
+            if (badgeValue === "LINK-LOCAL") {
+              return `<span class="badge badge-orange" title="APIPA / link-local IP address">LINK-LOCAL</span>`;
+            }
+            return `<span class="badge badge-gray">${escapeHtml(badgeValue)}</span>`;
+          })
+          .join("");
+        const interfaceName = String(item.interface_name || "").trim();
+        const interfaceLabel = interfaceName ? `<span class="badge badge-gray" title="Interface name">${escapeHtml(interfaceName)}</span>` : "";
+        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code>${badgeHtml}${interfaceLabel}</span>`;
       };
 
       const buildIpCell = (item) => {
