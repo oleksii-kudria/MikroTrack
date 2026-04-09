@@ -184,6 +184,37 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["offline_since"])
         self.assertIsNone(item["presence_duration_seconds"])
 
+    def test_offline_since_overrides_stale_idle_state_in_api(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:34",
+                            "ip_address": "192.168.88.34",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                            "online_since": None,
+                            "idle_since": "2026-04-08T10:08:00+00:00",
+                            "offline_since": "2026-04-08T10:10:00+00:00",
+                            "state_changed_at": "2026-04-08T10:10:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["status"], "offline")
+        self.assertEqual(item["flags"]["state"], "offline")
+        self.assertFalse(item["active"])
+        self.assertEqual(item["offline_since"], "2026-04-08T10:10:00+00:00")
+        self.assertIsInstance(item["offline_duration_seconds"], int)
+
 
 if __name__ == "__main__":
     unittest.main()
