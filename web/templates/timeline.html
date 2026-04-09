@@ -102,40 +102,32 @@
       .devices-toolbar {
         display: flex;
         flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
+        gap: 8px;
+      }
+
+      .devices-topbar {
+        display: flex;
+        justify-content: flex-end;
       }
 
       .devices-stats {
         display: inline-flex;
         align-items: center;
-        flex-wrap: wrap;
+        justify-content: flex-end;
         gap: 10px;
       }
 
-      .devices-title {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-weight: 600;
-      }
-
-      .info-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 18px;
-        height: 18px;
-        border: 1px solid #cbd5e1;
-        border-radius: 50%;
-        font-size: 0.78rem;
-        color: var(--muted);
-        cursor: help;
-        background: #fff;
-      }
-
       .devices-stats-line {
-        font-size: 0.9rem;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+
+      .devices-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-width: 0;
       }
 
       .active-filters {
@@ -143,6 +135,7 @@
         align-items: center;
         gap: 8px;
         flex-wrap: wrap;
+        min-width: 0;
       }
 
       .active-filters-label {
@@ -161,7 +154,36 @@
         display: inline-flex;
         gap: 8px;
         align-items: center;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+      }
+
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        line-height: 1;
+      }
+
+      .auto-refresh-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        user-select: none;
+      }
+
+      .auto-refresh-toggle input {
+        margin: 0;
+      }
+
+      .auto-refresh-toggle-text {
+        font-weight: 600;
+        color: #1e3a8a;
       }
 
       input, select {
@@ -408,6 +430,15 @@
         .toolbar {
           grid-template-columns: 1fr;
         }
+
+        .devices-controls {
+          flex-wrap: wrap;
+        }
+
+        .refresh-controls {
+          width: 100%;
+          justify-content: flex-end;
+        }
       }
 
       th.sortable {
@@ -503,28 +534,25 @@
 
       <section id="devices-panel" class="panel">
         <div class="devices-toolbar">
-          <div class="devices-stats">
-            <span class="devices-title">
-              Devices
-              <span class="info-icon" title="Current aggregated network state grouped by MAC." aria-label="Current aggregated network state grouped by MAC.">ℹ️</span>
-            </span>
-            <span id="devices-stats-line" class="devices-stats-line">Devices: 0 | 🟢 0 | 🟡 0 | ⚪ 0 | 🔴 0</span>
+          <div class="devices-topbar">
+            <div class="devices-stats">
+              <span id="devices-stats-line" class="devices-stats-line">Devices: 0 | 🟢 0 | 🟡 0 | ⚪ 0 | 🔴 0</span>
+            </div>
           </div>
-          <div id="active-filters" class="active-filters hidden" aria-live="polite">
-            <span class="active-filters-label">Active filters:</span>
-            <span id="active-filters-chips" class="active-filters-chips"></span>
-            <button id="clear-device-filters" type="button">Clear ✕</button>
-          </div>
-          <div class="refresh-controls">
-            <button id="devices-clear-sort" type="button">Clear sort</button>
-            <button id="devices-refresh" type="button">Refresh now</button>
-            <label class="stat" for="auto-refresh">
-              Auto refresh
-              <select id="auto-refresh">
-                <option value="off">OFF</option>
-                <option value="on" selected>ON</option>
-              </select>
-            </label>
+          <div class="devices-controls">
+            <div id="active-filters" class="active-filters hidden" aria-live="polite">
+              <span class="active-filters-label">Active filters:</span>
+              <span id="active-filters-chips" class="active-filters-chips"></span>
+              <button id="clear-device-filters" type="button">Clear ✕</button>
+            </div>
+            <div class="refresh-controls">
+              <button id="devices-clear-sort" class="icon-btn" type="button" title="Clear sorting" aria-label="Clear sorting">⇅</button>
+              <button id="devices-refresh" class="icon-btn" type="button" title="Refresh now" aria-label="Refresh now">↻</button>
+              <label class="stat auto-refresh-toggle" for="auto-refresh" title="Toggle auto refresh">
+                <span class="auto-refresh-toggle-text">Auto</span>
+                <input id="auto-refresh" type="checkbox" checked aria-label="Auto refresh" />
+              </label>
+            </div>
           </div>
         </div>
 
@@ -635,7 +663,7 @@
 
       const devicesTable = document.getElementById("devices-table");
       const deviceSortableHeaders = Array.from(document.querySelectorAll("#devices-panel th.sortable"));
-      const autoRefreshSelect = document.getElementById("auto-refresh");
+      const autoRefreshToggle = document.getElementById("auto-refresh");
       const devicesRefreshButton = document.getElementById("devices-refresh");
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
       const clearDeviceFiltersButton = document.getElementById("clear-device-filters");
@@ -1332,7 +1360,7 @@
           refreshTimer = null;
         }
 
-        if (autoRefreshSelect.value === "on") {
+        if (autoRefreshToggle.checked) {
           refreshTimer = setInterval(() => {
             if (!devicesPanel.classList.contains("hidden")) {
               loadDevices();
@@ -1350,7 +1378,7 @@
         clearDeviceFilters();
         renderDevicesView();
       });
-      autoRefreshSelect.addEventListener("change", reconfigureAutoRefresh);
+      autoRefreshToggle.addEventListener("change", reconfigureAutoRefresh);
       devicesTable.addEventListener("click", (event) => {
         const target = event.target.closest("[data-filter-type]");
         if (!target) {
