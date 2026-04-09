@@ -275,6 +275,20 @@
         background: #4b5563;
       }
 
+      .session-timer {
+        display: inline-block;
+        font-weight: 600;
+      }
+
+      .session-timer-idle {
+        color: #4b5563;
+      }
+
+      .session-timer-offline,
+      .session-timer-unknown {
+        color: #6b7280;
+      }
+
       .changes {
         margin: 0;
         padding-left: 18px;
@@ -687,41 +701,42 @@
         const idleSinceRaw = String(item.idle_since || "").trim();
         const offlineSinceRaw = String(item.offline_since || "").trim();
         const stateChangedRaw = String(item.state_changed_at || "").trim();
-        const onlineSince = fmtClock(onlineSinceRaw);
-        const idleSince = fmtClock(idleSinceRaw);
-        const offlineSince = fmtClock(offlineSinceRaw);
-        const stateChangedAt = fmtClock(item.state_changed_at);
-        const baseDataset = `data-online-since="${escapeHtml(onlineSinceRaw)}" data-idle-since="${escapeHtml(idleSinceRaw)}" data-offline-since="${escapeHtml(offlineSinceRaw)}" data-state-changed-at="${escapeHtml(stateChangedRaw)}"`;
-
-        if (state === "online") {
-          return `<div>Online: <strong data-live-timer="true" data-timer-kind="online" data-start-ts="${escapeHtml(onlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Last change: ${stateChangedAt}</div>`;
-        }
-        if (state === "idle") {
-          return `<div>Idle: <strong data-live-timer="true" data-timer-kind="idle" data-start-ts="${escapeHtml(idleSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Idle since: ${idleSince}</div>`;
-        }
-        if (state === "offline") {
-          return `<div>Offline: <strong data-live-timer="true" data-timer-kind="offline" data-start-ts="${escapeHtml(offlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Since: ${offlineSince}</div>`;
-        }
-        return `<div>Last change: <strong data-live-timer="true" data-timer-kind="last-change" data-start-ts="${escapeHtml(stateChangedRaw)}" ${baseDataset}>-</strong></div><div class="muted">At: ${stateChangedAt}</div>`;
+        const normalizedState = ["online", "idle", "offline", "unknown"].includes(state) ? state : "unknown";
+        const startByState = {
+          online: onlineSinceRaw,
+          idle: idleSinceRaw,
+          offline: offlineSinceRaw,
+          unknown: stateChangedRaw,
+        };
+        const timerClassByState = {
+          online: "session-timer-online",
+          idle: "session-timer-idle",
+          offline: "session-timer-offline",
+          unknown: "session-timer-unknown",
+        };
+        const baseDataset = `data-timer-state="${escapeHtml(normalizedState)}" data-online-since="${escapeHtml(onlineSinceRaw)}" data-idle-since="${escapeHtml(idleSinceRaw)}" data-offline-since="${escapeHtml(offlineSinceRaw)}" data-state-changed-at="${escapeHtml(stateChangedRaw)}"`;
+        const startTs = escapeHtml(startByState[normalizedState] || stateChangedRaw);
+        const timerClass = timerClassByState[normalizedState] || timerClassByState.unknown;
+        return `<strong class="session-timer ${timerClass}" data-live-timer="true" data-start-ts="${startTs}" ${baseDataset}>-</strong>`;
       };
 
       const buildTimerTitle = (element) => {
-        const kind = String(element.dataset.timerKind || "").trim();
+        const state = String(element.dataset.timerState || "").trim() || "unknown";
         const onlineSince = fmtClock(element.dataset.onlineSince);
         const idleSince = fmtClock(element.dataset.idleSince);
         const offlineSince = fmtClock(element.dataset.offlineSince);
         const stateChangedAt = fmtClock(element.dataset.stateChangedAt);
 
-        if (kind === "online") {
-          return `Online since: ${onlineSince}`;
+        if (state === "online") {
+          return `State: Online\nOnline since: ${onlineSince}\nLast change: ${stateChangedAt}`;
         }
-        if (kind === "idle") {
-          return `Online since: ${onlineSince}\nIdle since: ${idleSince}`;
+        if (state === "idle") {
+          return `State: Idle\nIdle since: ${idleSince}\nOnline since: ${onlineSince}\nLast change: ${stateChangedAt}`;
         }
-        if (kind === "offline") {
-          return `Offline since: ${offlineSince}`;
+        if (state === "offline") {
+          return `State: Offline\nOffline since: ${offlineSince}\nLast change: ${stateChangedAt}`;
         }
-        return `Last change: ${stateChangedAt}`;
+        return `State: Unknown\nLast change: ${stateChangedAt}`;
       };
 
       const updateLiveTimers = () => {
