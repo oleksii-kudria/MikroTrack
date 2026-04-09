@@ -442,8 +442,14 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 "Idle timeout exceeded for MAC %s, forcing state to offline",
                 mac,
             )
+        elif current_state == "idle" and previous_state == "offline":
+            merge_current_state = "offline"
+            device["arp_state"] = "offline"
+            device["fused_state"] = "offline"
+            decision = "skip_idle_timeout_already_offline"
+            logger.info("Skipping idle timeout, device already offline for MAC %s", mac)
         elif current_state == "idle" and previous_state == "idle":
-            logger.debug("Device remained idle within timeout for MAC %s", mac)
+            logger.debug("Idle within threshold for MAC %s", mac)
 
         previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, merge_current_state)
         previous_state_changed_at = previous.get("state_changed_at")
