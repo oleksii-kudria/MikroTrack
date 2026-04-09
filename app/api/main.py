@@ -274,6 +274,7 @@ def list_devices() -> dict[str, object]:
             {
                 "state_changed_at": None,
                 "online_since": None,
+                "idle_since": None,
                 "offline_since": None,
             },
         )
@@ -282,10 +283,12 @@ def list_devices() -> dict[str, object]:
         if current_state in {"online", "idle"}:
             if previous_state not in {"online", "idle"} or session["online_since"] is None:
                 session["online_since"] = timestamp
+            session["idle_since"] = timestamp if current_state == "idle" else None
             session["offline_since"] = None
         elif current_state == "offline":
             session["offline_since"] = timestamp
             session["online_since"] = None
+            session["idle_since"] = None
 
     items: list[dict[str, Any]] = []
 
@@ -328,12 +331,15 @@ def list_devices() -> dict[str, object]:
 
         state_changed_at = _parse_ts(str(device.get("state_changed_at", "")))
         online_since = _parse_ts(str(device.get("online_since", "")))
+        idle_since = _parse_ts(str(device.get("idle_since", "")))
         offline_since = _parse_ts(str(device.get("offline_since", "")))
 
         if not isinstance(state_changed_at, datetime) and isinstance(session, dict):
             state_changed_at = session.get("state_changed_at")
         if not isinstance(online_since, datetime) and isinstance(session, dict):
             online_since = session.get("online_since")
+        if not isinstance(idle_since, datetime) and isinstance(session, dict):
+            idle_since = session.get("idle_since")
         if not isinstance(offline_since, datetime) and isinstance(session, dict):
             offline_since = session.get("offline_since")
 
@@ -348,8 +354,8 @@ def list_devices() -> dict[str, object]:
             else None
         )
         idle_duration_seconds = (
-            max(0, int((now - state_changed_at).total_seconds()))
-            if device_state == "idle" and isinstance(state_changed_at, datetime)
+            max(0, int((now - idle_since).total_seconds()))
+            if device_state == "idle" and isinstance(idle_since, datetime)
             else None
         )
         elapsed_seconds = presence_duration_seconds or offline_duration_seconds or 0
@@ -390,6 +396,7 @@ def list_devices() -> dict[str, object]:
                 "last_change": state_changed_at.isoformat() if isinstance(state_changed_at, datetime) else None,
                 "state_changed_at": state_changed_at.isoformat() if isinstance(state_changed_at, datetime) else None,
                 "online_since": online_since.isoformat() if isinstance(online_since, datetime) else None,
+                "idle_since": idle_since.isoformat() if isinstance(idle_since, datetime) else None,
                 "offline_since": offline_since.isoformat() if isinstance(offline_since, datetime) else None,
                 "presence_duration_seconds": presence_duration_seconds,
                 "offline_duration_seconds": offline_duration_seconds,
