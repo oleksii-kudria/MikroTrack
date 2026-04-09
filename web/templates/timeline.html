@@ -101,17 +101,41 @@
 
       .devices-toolbar {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column;
+        align-items: stretch;
         gap: 10px;
-        flex-wrap: wrap;
       }
 
-      .devices-toolbar-left {
+      .devices-stats {
         display: inline-flex;
         align-items: center;
         flex-wrap: wrap;
         gap: 10px;
+      }
+
+      .devices-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+      }
+
+      .info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border: 1px solid #cbd5e1;
+        border-radius: 50%;
+        font-size: 0.78rem;
+        color: var(--muted);
+        cursor: help;
+        background: #fff;
+      }
+
+      .devices-stats-line {
+        font-size: 0.9rem;
       }
 
       .active-filters {
@@ -126,10 +150,18 @@
         font-size: 0.88rem;
       }
 
+      .active-filters-chips {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
       .refresh-controls {
         display: inline-flex;
         gap: 8px;
         align-items: center;
+        flex-wrap: wrap;
       }
 
       input, select {
@@ -398,13 +430,9 @@
           <h1>MikroTrack</h1>
           <p class="muted" id="backend-source"></p>
           <div class="tabs">
-            <button id="tab-timeline" class="tab-btn active" type="button">Timeline</button>
-            <button id="tab-devices" class="tab-btn" type="button">Devices</button>
+            <button id="tab-devices" class="tab-btn active" type="button">Devices</button>
+            <button id="tab-timeline" class="tab-btn" type="button">Timeline</button>
           </div>
-        </div>
-        <div class="stats" id="timeline-stats">
-          <span class="stat"><span class="dot"></span>Loaded: <strong id="visible-count">{{ events|length }}</strong></span>
-          <span class="stat">Total: <strong id="total-count">{{ events|length }}</strong></span>
         </div>
       </header>
 
@@ -412,7 +440,7 @@
       <p class="error">{{ error_message }}</p>
       {% endif %}
 
-      <section id="timeline-panel" class="panel">
+      <section id="timeline-panel" class="panel hidden">
         <div class="toolbar">
           <input id="mac-filter" type="text" placeholder="Filter by MAC..." />
           <select id="event-type">
@@ -473,16 +501,19 @@
         </div>
       </section>
 
-      <section id="devices-panel" class="panel hidden">
+      <section id="devices-panel" class="panel">
         <div class="devices-toolbar">
-          <div class="devices-toolbar-left">
-            <div class="muted">Current aggregated network state grouped by MAC.</div>
-            <div id="active-filters" class="active-filters hidden" aria-live="polite">
-              <span class="active-filters-label">Active filters</span>
-              <span id="active-status-filter" class="badge badge-blue">Status: -</span>
-              <span id="active-assignment-filter" class="badge badge-purple">Assignment: -</span>
-              <button id="clear-device-filters" type="button">Clear filters</button>
-            </div>
+          <div class="devices-stats">
+            <span class="devices-title">
+              Devices
+              <span class="info-icon" title="Current aggregated network state grouped by MAC." aria-label="Current aggregated network state grouped by MAC.">ℹ️</span>
+            </span>
+            <span id="devices-stats-line" class="devices-stats-line">Devices: 0 | 🟢 0 | 🟡 0 | ⚪ 0 | 🔴 0</span>
+          </div>
+          <div id="active-filters" class="active-filters hidden" aria-live="polite">
+            <span class="active-filters-label">Active filters:</span>
+            <span id="active-filters-chips" class="active-filters-chips"></span>
+            <button id="clear-device-filters" type="button">Clear ✕</button>
           </div>
           <div class="refresh-controls">
             <button id="devices-clear-sort" type="button">Clear sort</button>
@@ -532,13 +563,11 @@
       const tabDevices = document.getElementById("tab-devices");
       const timelinePanel = document.getElementById("timeline-panel");
       const devicesPanel = document.getElementById("devices-panel");
-      const timelineStats = document.getElementById("timeline-stats");
 
       const setActiveTab = (tab) => {
         const showTimeline = tab === "timeline";
         timelinePanel.classList.toggle("hidden", !showTimeline);
         devicesPanel.classList.toggle("hidden", showTimeline);
-        timelineStats.classList.toggle("hidden", !showTimeline);
         tabTimeline.classList.toggle("active", showTimeline);
         tabDevices.classList.toggle("active", !showTimeline);
 
@@ -556,15 +585,10 @@
       const resetButton = document.getElementById("reset-filters");
       const tableBody = document.getElementById("events-table");
       const rows = Array.from(document.querySelectorAll("#events-table tr[data-event-type]"));
-      const visibleCount = document.getElementById("visible-count");
-      const totalCount = document.getElementById("total-count");
       const emptyRow = document.getElementById("empty-row");
 
       const setCounts = () => {
         const visibleRows = rows.filter((row) => row.style.display !== "none").length;
-        visibleCount.textContent = String(visibleRows);
-        totalCount.textContent = String(rows.length);
-
         if (emptyRow) {
           emptyRow.style.display = visibleRows === 0 ? "table-row" : "none";
         }
@@ -616,8 +640,8 @@
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
       const clearDeviceFiltersButton = document.getElementById("clear-device-filters");
       const activeFiltersBlock = document.getElementById("active-filters");
-      const activeStatusFilterLabel = document.getElementById("active-status-filter");
-      const activeAssignmentFilterLabel = document.getElementById("active-assignment-filter");
+      const activeFiltersChips = document.getElementById("active-filters-chips");
+      const devicesStatsLine = document.getElementById("devices-stats-line");
       let refreshTimer = null;
       let deviceItems = [];
       let activeDeviceSort = null;
@@ -826,8 +850,35 @@
         const hasAssignment = Boolean(assignmentFilter);
         const hasAny = hasStatus || hasAssignment;
         activeFiltersBlock.classList.toggle("hidden", !hasAny);
-        activeStatusFilterLabel.textContent = `Status: ${hasStatus ? statusFilter : "-"}`;
-        activeAssignmentFilterLabel.textContent = `Assignment: ${hasAssignment ? assignmentFilter : "-"}`;
+        if (!hasAny) {
+          activeFiltersChips.innerHTML = "";
+          return;
+        }
+
+        const chips = [];
+        if (hasStatus) {
+          chips.push(`<span class="badge badge-blue">Status: ${escapeHtml(statusFilter)}</span>`);
+        }
+        if (hasAssignment) {
+          chips.push(`<span class="badge badge-purple">Assignment: ${escapeHtml(assignmentFilter)}</span>`);
+        }
+        activeFiltersChips.innerHTML = chips.join("");
+      };
+
+      const updateDevicesStats = (items) => {
+        const stats = {
+          online: 0,
+          idle: 0,
+          unknown: 0,
+          offline: 0,
+        };
+        items.forEach((item) => {
+          const state = normalizeStatus(item);
+          if (state in stats) {
+            stats[state] += 1;
+          }
+        });
+        devicesStatsLine.textContent = `Devices: ${items.length} | 🟢 ${stats.online} | 🟡 ${stats.idle} | ⚪ ${stats.unknown} | 🔴 ${stats.offline}`;
       };
 
       const applyDeviceFilters = (items) => {
@@ -1140,14 +1191,16 @@
       };
 
       const renderDevices = (items) => {
-        if (!items.length) {
+        const filteredItems = applyDeviceFilters(items);
+        updateDevicesStats(filteredItems);
+
+        if (!filteredItems.length) {
           devicesTable.innerHTML = '<tr><td class="empty" colspan="7">No devices found</td></tr>';
           updateActiveFiltersUI();
           updateLiveTimers();
           return;
         }
 
-        const filteredItems = applyDeviceFilters(items);
         const sortedItems = sortDeviceItems(filteredItems);
 
         devicesTable.innerHTML = sortedItems
@@ -1267,6 +1320,7 @@
       setCounts();
       updateDeviceSortIndicators();
       reconfigureAutoRefresh();
+      loadDevices();
       updateLiveTimers();
       setInterval(updateLiveTimers, 1000);
     </script>
