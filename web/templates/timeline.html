@@ -107,6 +107,25 @@
         flex-wrap: wrap;
       }
 
+      .devices-toolbar-left {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .active-filters {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .active-filters-label {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
       .refresh-controls {
         display: inline-flex;
         gap: 8px;
@@ -198,6 +217,23 @@
         font-size: 0.75rem;
       }
 
+      .badge.filter-chip {
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+      }
+
+      .badge.filter-chip:hover {
+        border-color: #93c5fd;
+        filter: brightness(0.97);
+      }
+
+      .badge.filter-chip.active {
+        border-color: #1d4ed8;
+        box-shadow: inset 0 0 0 1px #1d4ed8;
+        filter: brightness(0.95);
+      }
+
       .badge-wrap {
         display: flex;
         flex-wrap: wrap;
@@ -246,6 +282,22 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
+      }
+
+      .status-value {
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 2px 8px;
+      }
+
+      .status-value:hover {
+        background: #f1f5f9;
+      }
+
+      .status-value.active {
+        background: #dbeafe;
+        color: #1d4ed8;
+        box-shadow: inset 0 0 0 1px #93c5fd;
       }
 
       .status-dot {
@@ -423,7 +475,15 @@
 
       <section id="devices-panel" class="panel hidden">
         <div class="devices-toolbar">
-          <div class="muted">Current aggregated network state grouped by MAC.</div>
+          <div class="devices-toolbar-left">
+            <div class="muted">Current aggregated network state grouped by MAC.</div>
+            <div id="active-filters" class="active-filters hidden" aria-live="polite">
+              <span class="active-filters-label">Active filters</span>
+              <span id="active-status-filter" class="badge badge-blue">Status: -</span>
+              <span id="active-assignment-filter" class="badge badge-purple">Assignment: -</span>
+              <button id="clear-device-filters" type="button">Clear filters</button>
+            </div>
+          </div>
           <div class="refresh-controls">
             <button id="devices-clear-sort" type="button">Clear sort</button>
             <button id="devices-refresh" type="button">Refresh now</button>
@@ -554,6 +614,10 @@
       const autoRefreshSelect = document.getElementById("auto-refresh");
       const devicesRefreshButton = document.getElementById("devices-refresh");
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
+      const clearDeviceFiltersButton = document.getElementById("clear-device-filters");
+      const activeFiltersBlock = document.getElementById("active-filters");
+      const activeStatusFilterLabel = document.getElementById("active-status-filter");
+      const activeAssignmentFilterLabel = document.getElementById("active-assignment-filter");
       let refreshTimer = null;
       let deviceItems = [];
       let activeDeviceSort = null;
@@ -608,8 +672,11 @@
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
 
-      const badge = (label, cssClass, tooltip) =>
-        `<span class="badge ${cssClass}" title="${escapeHtml(tooltip || label)}">${escapeHtml(label)}</span>`;
+      const badge = (label, cssClass, tooltip, options = {}) => {
+        const extraClass = options.extraClass ? ` ${options.extraClass}` : "";
+        const extraAttributes = options.attrs ? ` ${options.attrs}` : "";
+        return `<span class="badge ${cssClass}${extraClass}" title="${escapeHtml(tooltip || label)}"${extraAttributes}>${escapeHtml(label)}</span>`;
+      };
 
       const isRandomMac = (macRaw) => {
         const mac = String(macRaw || "").trim().toUpperCase();
@@ -625,14 +692,20 @@
       };
 
       const buildSemanticAssignmentBadge = (item) => {
+        const assignment = resolveAssignment(item);
+        const activeClass = assignment && assignmentFilter === assignment ? "active" : "";
+        const clickableAttrs = assignment
+          ? `data-filter-type="assignment" data-filter-value="${escapeHtml(assignment)}" role="button" tabindex="0" aria-label="${escapeHtml(`Filter by assignment ${assignment}`)}"`
+          : "";
+        const clickableClass = assignment ? "filter-chip" : "";
         const entityType = String(item.entity_type || "client").trim().toLowerCase();
         const interfaceName = String(item.interface_name || "").trim();
         if (entityType === "interface") {
           const nameHtml = interfaceName ? ` <span class="badge badge-gray" title="Interface name">${escapeHtml(interfaceName)}</span>` : "";
-          return `${badge("INTERFACE", "badge-purple", "Local MikroTik interface MAC")}${nameHtml}`;
+          return `${badge("INTERFACE", "badge-purple", "Local MikroTik interface MAC", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs })}${nameHtml}`;
         }
         if (isRandomMac(item.mac)) {
-          return badge("RANDOM", "badge-orange", "Locally administered MAC (privacy/randomized)");
+          return badge("RANDOM", "badge-orange", "Locally administered MAC (privacy/randomized)", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
         }
 
         const flags = item.flags || {};
@@ -644,17 +717,17 @@
         const dhcpIsStatic = dhcpFlag === "S";
 
         if (arpIsStatic) {
-          return badge("PERM", "badge-purple", "Pinned device");
+          return badge("PERM", "badge-purple", "Pinned device", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
         }
         if (hasDhcpLease && dhcpIsStatic) {
-          return badge("STATIC", "badge-blue", "Reserved client");
+          return badge("STATIC", "badge-blue", "Reserved client", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
         }
         if (hasDhcpLease && dhcpIsDynamic) {
-          return badge("DYNAMIC", "badge-gray", "Dynamic client");
+          return badge("DYNAMIC", "badge-gray", "Dynamic client", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
         }
 
         if (!hasDhcpLease && arpFlag === "DC") {
-          return badge("COMPLETE", "badge-green", "Complete ARP record without DHCP lease");
+          return badge("COMPLETE", "badge-green", "Complete ARP record without DHCP lease", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
         }
 
         return "";
@@ -735,7 +808,8 @@
       };
 
       const setStatusFilter = (value) => {
-        statusFilter = value || null;
+        const normalized = String(value || "").trim().toLowerCase();
+        statusFilter = normalized || null;
       };
 
       const setAssignmentFilter = (value) => {
@@ -745,6 +819,15 @@
       const clearDeviceFilters = () => {
         statusFilter = null;
         assignmentFilter = null;
+      };
+
+      const updateActiveFiltersUI = () => {
+        const hasStatus = Boolean(statusFilter);
+        const hasAssignment = Boolean(assignmentFilter);
+        const hasAny = hasStatus || hasAssignment;
+        activeFiltersBlock.classList.toggle("hidden", !hasAny);
+        activeStatusFilterLabel.textContent = `Status: ${hasStatus ? statusFilter : "-"}`;
+        activeAssignmentFilterLabel.textContent = `Assignment: ${hasAssignment ? assignmentFilter : "-"}`;
       };
 
       const applyDeviceFilters = (items) => {
@@ -772,7 +855,8 @@
             : state === "idle"
               ? "status-idle"
               : "status-unknown";
-        return `<span class="status-mac"><span class="status-dot ${cls}"></span>${escapeHtml(state)}</span>`;
+        const activeClass = statusFilter === state ? "active" : "";
+        return `<span class="status-mac status-value ${activeClass}" data-filter-type="status" data-filter-value="${escapeHtml(state)}" role="button" tabindex="0" aria-label="${escapeHtml(`Filter by status ${state}`)}"><span class="status-dot ${cls}"></span>${escapeHtml(state)}</span>`;
       };
 
       const buildIpCell = (item) => {
@@ -1058,6 +1142,7 @@
       const renderDevices = (items) => {
         if (!items.length) {
           devicesTable.innerHTML = '<tr><td class="empty" colspan="7">No devices found</td></tr>';
+          updateActiveFiltersUI();
           updateLiveTimers();
           return;
         }
@@ -1080,6 +1165,7 @@
             `;
           })
           .join("");
+        updateActiveFiltersUI();
         updateDeviceSortIndicators();
         updateLiveTimers();
       };
@@ -1119,7 +1205,53 @@
         activeDeviceSort = null;
         renderDevices(deviceItems);
       });
+      clearDeviceFiltersButton.addEventListener("click", () => {
+        clearDeviceFilters();
+        renderDevices(deviceItems);
+      });
       autoRefreshSelect.addEventListener("change", reconfigureAutoRefresh);
+      devicesTable.addEventListener("click", (event) => {
+        const target = event.target.closest("[data-filter-type]");
+        if (!target) {
+          return;
+        }
+
+        const filterType = String(target.dataset.filterType || "").trim();
+        const filterValue = String(target.dataset.filterValue || "").trim();
+        if (!filterType || !filterValue) {
+          return;
+        }
+
+        if (filterType === "status") {
+          if (statusFilter === filterValue) {
+            setStatusFilter(null);
+          } else {
+            setStatusFilter(filterValue);
+          }
+          renderDevices(deviceItems);
+          return;
+        }
+
+        if (filterType === "assignment") {
+          if (assignmentFilter === filterValue) {
+            setAssignmentFilter(null);
+          } else {
+            setAssignmentFilter(filterValue);
+          }
+          renderDevices(deviceItems);
+        }
+      });
+      devicesTable.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        const target = event.target.closest("[data-filter-type]");
+        if (!target) {
+          return;
+        }
+        event.preventDefault();
+        target.click();
+      });
       deviceSortableHeaders.forEach((header) => {
         header.addEventListener("click", () => {
           const key = String(header.dataset.sortKey || "");
