@@ -425,6 +425,7 @@
         <div class="devices-toolbar">
           <div class="muted">Current aggregated network state grouped by MAC.</div>
           <div class="refresh-controls">
+            <button id="devices-clear-sort" type="button">Clear sort</button>
             <button id="devices-refresh" type="button">Refresh now</button>
             <label class="stat" for="auto-refresh">
               Auto refresh
@@ -446,7 +447,7 @@
                 <th class="sortable" data-sort-key="comments">Comments<span class="sort-indicator">↕</span></th>
                 <th class="sortable" data-sort-key="assignment">Assignment<span class="sort-indicator">↕</span></th>
                 <th class="sortable" data-sort-key="status">Status<span class="sort-indicator">↕</span></th>
-                <th class="sortable" data-sort-key="session">Session / state time<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="session">State time<span class="sort-indicator">↕</span></th>
               </tr>
             </thead>
             <tbody id="devices-table">
@@ -552,9 +553,10 @@
       const deviceSortableHeaders = Array.from(document.querySelectorAll("#devices-panel th.sortable"));
       const autoRefreshSelect = document.getElementById("auto-refresh");
       const devicesRefreshButton = document.getElementById("devices-refresh");
+      const devicesClearSortButton = document.getElementById("devices-clear-sort");
       let refreshTimer = null;
       let deviceItems = [];
-      let activeDeviceSort = { key: null, direction: null };
+      let activeDeviceSorts = [];
 
       const fmtClock = (value) => {
         const raw = String(value || "").trim();
@@ -845,53 +847,114 @@
         offline: 3,
       };
 
-      const sortDeviceItems = (items) => {
-        const { key, direction } = activeDeviceSort;
+      const compareBySortKey = (left, right, key, direction) => {
         if (!key || !direction) {
+          return 0;
+        }
+
+        if (key === "status") {
+          const leftStatus = normalizeStatus(left);
+          const rightStatus = normalizeStatus(right);
+          const leftPriority = statusPriority[leftStatus] ?? 99;
+          const rightPriority = statusPriority[rightStatus] ?? 99;
+          if (leftPriority !== rightPriority) {
+            return direction === "asc" ? leftPriority - rightPriority : rightPriority - leftPriority;
+          }
+
+          const leftTs = readStateTimestampMs(left);
+          const rightTs = readStateTimestampMs(right);
+          return compareNullable(leftTs, rightTs, direction, (a, b) => b - a);
+        }
+
+        if (key === "session") {
+          const leftTs = readStateTimestampMs(left);
+          const rightTs = readStateTimestampMs(right);
+          return compareNullable(leftTs, rightTs, direction, (a, b) => b - a);
+        }
+
+        if (key === "ip") {
+          const leftIp = parseIpToNumber(left.ip);
+          const rightIp = parseIpToNumber(right.ip);
+          return compareNullable(leftIp, rightIp, direction, (a, b) => a - b);
+        }
+
+        const textResolvers = {
+          mac: (item) => normalizeText(item.mac),
+          hostname: (item) => normalizeText(item.hostname),
+          comments: resolveCommentSortValue,
+          assignment: resolveAssignmentSortValue,
+        };
+        const resolver = textResolvers[key];
+        if (!resolver) {
+          return 0;
+        }
+        const leftText = resolver(left);
+        const rightText = resolver(right);
+        return compareNullable(leftText, rightText, direction, (a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      };
+
+      const sortDeviceItems = (items) => {
+        if (!activeDeviceSorts.length) {
           return [...items];
         }
 
-        return [...items].sort((left, right) => {
-          if (key === "status") {
-            const leftStatus = normalizeStatus(left);
-            const rightStatus = normalizeStatus(right);
-            const leftPriority = statusPriority[leftStatus] ?? 99;
-            const rightPriority = statusPriority[rightStatus] ?? 99;
-            if (leftPriority !== rightPriority) {
-              return direction === "asc" ? leftPriority - rightPriority : rightPriority - leftPriority;
+        return items
+          .map((item, index) => ({ item, index }))
+          .sort((leftWrapped, rightWrapped) => {
+            for (const sortEntry of activeDeviceSorts) {
+              const compared = compareBySortKey(leftWrapped.item, rightWrapped.item, sortEntry.key, sortEntry.direction);
+              if (compared !== 0) {
+                return compared;
+              }
             }
+            return leftWrapped.index - rightWrapped.index;
+          })
+          .map((entry) => entry.item);
+      };
 
-            const leftTs = readStateTimestampMs(left);
-            const rightTs = readStateTimestampMs(right);
-            return compareNullable(leftTs, rightTs, direction, (a, b) => b - a);
+      const cycleDirection = (direction) => {
+        if (!direction) {
+          return "asc";
+        }
+        if (direction === "asc") {
+          return "desc";
+        }
+        return null;
+      };
+
+      const applySortHeaderClick = (key, withShift) => {
+        const sortIndex = activeDeviceSorts.findIndex((entry) => entry.key === key);
+        if (!withShift) {
+          if (sortIndex === 0 && activeDeviceSorts.length === 1) {
+            const nextDirection = cycleDirection(activeDeviceSorts[0].direction);
+            activeDeviceSorts = nextDirection ? [{ key, direction: nextDirection }] : [];
+            return;
           }
 
-          if (key === "session") {
-            const leftTs = readStateTimestampMs(left);
-            const rightTs = readStateTimestampMs(right);
-            return compareNullable(leftTs, rightTs, direction, (a, b) => b - a);
+          if (sortIndex >= 0) {
+            const nextDirection = cycleDirection(activeDeviceSorts[sortIndex].direction);
+            activeDeviceSorts = nextDirection ? [{ key, direction: nextDirection }] : [];
+            return;
           }
 
-          if (key === "ip") {
-            const leftIp = parseIpToNumber(left.ip);
-            const rightIp = parseIpToNumber(right.ip);
-            return compareNullable(leftIp, rightIp, direction, (a, b) => a - b);
-          }
+          activeDeviceSorts = [{ key, direction: "asc" }];
+          return;
+        }
 
-          const textResolvers = {
-            mac: (item) => normalizeText(item.mac),
-            hostname: (item) => normalizeText(item.hostname),
-            comments: resolveCommentSortValue,
-            assignment: resolveAssignmentSortValue,
-          };
-          const resolver = textResolvers[key];
-          if (!resolver) {
-            return 0;
-          }
-          const leftText = resolver(left);
-          const rightText = resolver(right);
-          return compareNullable(leftText, rightText, direction, (a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-        });
+        if (sortIndex < 0) {
+          activeDeviceSorts = [...activeDeviceSorts, { key, direction: "asc" }];
+          return;
+        }
+
+        const nextDirection = cycleDirection(activeDeviceSorts[sortIndex].direction);
+        if (!nextDirection) {
+          activeDeviceSorts = activeDeviceSorts.filter((entry) => entry.key !== key);
+          return;
+        }
+
+        const updatedSorts = [...activeDeviceSorts];
+        updatedSorts[sortIndex] = { key, direction: nextDirection };
+        activeDeviceSorts = updatedSorts;
       };
 
       const updateDeviceSortIndicators = () => {
@@ -901,11 +964,14 @@
           if (!indicator) {
             return;
           }
-          if (activeDeviceSort.key !== key || !activeDeviceSort.direction) {
+          const sortIndex = activeDeviceSorts.findIndex((entry) => entry.key === key);
+          if (sortIndex < 0) {
             indicator.textContent = "↕";
             return;
           }
-          indicator.textContent = activeDeviceSort.direction === "asc" ? "↑" : "↓";
+          const direction = activeDeviceSorts[sortIndex].direction;
+          const arrow = direction === "asc" ? "↑" : "↓";
+          indicator.textContent = `${arrow}[${sortIndex + 1}]`;
         });
       };
 
@@ -1002,20 +1068,18 @@
       };
 
       devicesRefreshButton.addEventListener("click", loadDevices);
+      devicesClearSortButton.addEventListener("click", () => {
+        activeDeviceSorts = [];
+        renderDevices(deviceItems);
+      });
       autoRefreshSelect.addEventListener("change", reconfigureAutoRefresh);
       deviceSortableHeaders.forEach((header) => {
-        header.addEventListener("click", () => {
+        header.addEventListener("click", (event) => {
           const key = String(header.dataset.sortKey || "");
           if (!key) {
             return;
           }
-          if (activeDeviceSort.key !== key || !activeDeviceSort.direction) {
-            activeDeviceSort = { key, direction: "asc" };
-          } else if (activeDeviceSort.direction === "asc") {
-            activeDeviceSort = { key, direction: "desc" };
-          } else {
-            activeDeviceSort = { key: null, direction: null };
-          }
+          applySortHeaderClick(key, Boolean(event.shiftKey));
           renderDevices(deviceItems);
         });
       });
