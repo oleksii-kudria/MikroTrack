@@ -325,6 +325,18 @@
           grid-template-columns: 1fr;
         }
       }
+
+      th.sortable {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+      }
+
+      .sort-indicator {
+        margin-left: 0.35rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
     </style>
   </head>
   <body>
@@ -428,16 +440,17 @@
           <table>
             <thead>
               <tr>
-                <th>MAC</th>
-                <th>IP</th>
-                <th>Hostname</th>
-                <th>Comments</th>
-                <th>Assignment</th>
-                <th>Session / state time</th>
+                <th class="sortable" data-sort-key="mac">MAC<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="ip">IP<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="hostname">Hostname<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="comments">Comments<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="assignment">Assignment<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="status">Status<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="session">Session / state time<span class="sort-indicator">↕</span></th>
               </tr>
             </thead>
             <tbody id="devices-table">
-              <tr><td class="empty" colspan="6">Loading devices...</td></tr>
+              <tr><td class="empty" colspan="7">Loading devices...</td></tr>
             </tbody>
           </table>
         </div>
@@ -536,9 +549,12 @@
       });
 
       const devicesTable = document.getElementById("devices-table");
+      const deviceSortableHeaders = Array.from(document.querySelectorAll("#devices-panel th.sortable"));
       const autoRefreshSelect = document.getElementById("auto-refresh");
       const devicesRefreshButton = document.getElementById("devices-refresh");
       let refreshTimer = null;
+      let deviceItems = [];
+      let activeDeviceSort = { key: null, direction: null };
 
       const fmtClock = (value) => {
         const raw = String(value || "").trim();
@@ -676,6 +692,23 @@
         return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
       };
 
+      const normalizeStatus = (item) => {
+        const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
+        return ["online", "offline", "idle", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+      };
+
+      const buildStatusCell = (item) => {
+        const state = normalizeStatus(item);
+        const cls = state === "online"
+          ? "status-active"
+          : state === "offline"
+            ? "status-inactive"
+            : state === "idle"
+              ? "status-idle"
+              : "status-unknown";
+        return `<span class="status-mac"><span class="status-dot ${cls}"></span>${escapeHtml(state)}</span>`;
+      };
+
       const buildIpCell = (item) => {
         const ipText = String(item.ip || "").trim() || "-";
         const parts = [`<span>${escapeHtml(ipText)}</span>`];
@@ -696,7 +729,7 @@
       };
 
       const buildSessionCell = (item) => {
-        const state = String(item.status || "").toLowerCase();
+        const state = normalizeStatus(item);
         const onlineSinceRaw = String(item.online_since || "").trim();
         const idleSinceRaw = String(item.idle_since || "").trim();
         const offlineSinceRaw = String(item.offline_since || "").trim();
@@ -718,6 +751,162 @@
         const startTs = escapeHtml(startByState[normalizedState] || stateChangedRaw);
         const timerClass = timerClassByState[normalizedState] || timerClassByState.unknown;
         return `<strong class="session-timer ${timerClass}" data-live-timer="true" data-start-ts="${startTs}" ${baseDataset}>-</strong>`;
+      };
+
+      const readStateTimestampMs = (item) => {
+        const state = normalizeStatus(item);
+        const byState = {
+          online: item.online_since,
+          idle: item.idle_since,
+          offline: item.offline_since,
+          unknown: item.state_changed_at,
+        };
+        return parseTimestampMs(byState[state] || item.state_changed_at);
+      };
+
+      const normalizeText = (value) => {
+        const text = String(value ?? "").trim();
+        return text && text !== "-" ? text : null;
+      };
+
+      const compareNullable = (leftValue, rightValue, direction, compareNonNull) => {
+        const leftEmpty = leftValue === null;
+        const rightEmpty = rightValue === null;
+        if (leftEmpty && rightEmpty) {
+          return 0;
+        }
+        // Фіксоване правило: пусті значення завжди внизу незалежно від напряму.
+        if (leftEmpty) {
+          return 1;
+        }
+        if (rightEmpty) {
+          return -1;
+        }
+        return direction === "asc" ? compareNonNull(leftValue, rightValue) : compareNonNull(rightValue, leftValue);
+      };
+
+      const parseIpToNumber = (rawIp) => {
+        const ipText = normalizeText(rawIp);
+        if (ipText === null) {
+          return null;
+        }
+        const parts = ipText.split(".");
+        if (parts.length !== 4) {
+          return null;
+        }
+        const octets = parts.map((part) => Number.parseInt(part, 10));
+        if (octets.some((octet) => Number.isNaN(octet) || octet < 0 || octet > 255)) {
+          return null;
+        }
+        return octets[0] * 256 ** 3 + octets[1] * 256 ** 2 + octets[2] * 256 + octets[3];
+      };
+
+      const resolveCommentSortValue = (item) => {
+        const dhcpComment = normalizeText(item.dhcp_comment);
+        const arpComment = normalizeText(item.arp_comment);
+        if (!dhcpComment && !arpComment) {
+          return null;
+        }
+        return [dhcpComment, arpComment].filter(Boolean).join(" | ");
+      };
+
+      const resolveAssignmentSortValue = (item) => {
+        const entityType = String(item.entity_type || "client").trim().toLowerCase();
+        const interfaceName = normalizeText(item.interface_name);
+        if (entityType === "interface") {
+          return `interface ${interfaceName || ""}`.trim();
+        }
+        const flags = item.flags || {};
+        const arpFlag = String(flags.arp_flag || "").trim().toUpperCase();
+        const dhcpFlag = String(flags.dhcp_flag || "").trim().toUpperCase();
+        const hasDhcpLease = Boolean(dhcpFlag);
+        const dhcpIsDynamic = dhcpFlag === "D";
+        const arpIsStatic = arpFlag.startsWith("S");
+        const dhcpIsStatic = dhcpFlag === "S";
+        if (arpIsStatic) {
+          return "perm";
+        }
+        if (hasDhcpLease && dhcpIsStatic) {
+          return "static";
+        }
+        if (hasDhcpLease && dhcpIsDynamic) {
+          return "dynamic";
+        }
+        if (!hasDhcpLease && arpFlag === "DC") {
+          return "complete";
+        }
+        return null;
+      };
+
+      const statusPriority = {
+        online: 0,
+        idle: 1,
+        unknown: 2,
+        offline: 3,
+      };
+
+      const sortDeviceItems = (items) => {
+        const { key, direction } = activeDeviceSort;
+        if (!key || !direction) {
+          return [...items];
+        }
+
+        return [...items].sort((left, right) => {
+          if (key === "status") {
+            const leftStatus = normalizeStatus(left);
+            const rightStatus = normalizeStatus(right);
+            const leftPriority = statusPriority[leftStatus] ?? 99;
+            const rightPriority = statusPriority[rightStatus] ?? 99;
+            if (leftPriority !== rightPriority) {
+              return direction === "asc" ? leftPriority - rightPriority : rightPriority - leftPriority;
+            }
+
+            const leftTs = readStateTimestampMs(left);
+            const rightTs = readStateTimestampMs(right);
+            return compareNullable(leftTs, rightTs, direction, (a, b) => b - a);
+          }
+
+          if (key === "session") {
+            const leftTs = readStateTimestampMs(left);
+            const rightTs = readStateTimestampMs(right);
+            return compareNullable(leftTs, rightTs, direction, (a, b) => b - a);
+          }
+
+          if (key === "ip") {
+            const leftIp = parseIpToNumber(left.ip);
+            const rightIp = parseIpToNumber(right.ip);
+            return compareNullable(leftIp, rightIp, direction, (a, b) => a - b);
+          }
+
+          const textResolvers = {
+            mac: (item) => normalizeText(item.mac),
+            hostname: (item) => normalizeText(item.hostname),
+            comments: resolveCommentSortValue,
+            assignment: resolveAssignmentSortValue,
+          };
+          const resolver = textResolvers[key];
+          if (!resolver) {
+            return 0;
+          }
+          const leftText = resolver(left);
+          const rightText = resolver(right);
+          return compareNullable(leftText, rightText, direction, (a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+        });
+      };
+
+      const updateDeviceSortIndicators = () => {
+        deviceSortableHeaders.forEach((header) => {
+          const key = header.dataset.sortKey;
+          const indicator = header.querySelector(".sort-indicator");
+          if (!indicator) {
+            return;
+          }
+          if (activeDeviceSort.key !== key || !activeDeviceSort.direction) {
+            indicator.textContent = "↕";
+            return;
+          }
+          indicator.textContent = activeDeviceSort.direction === "asc" ? "↑" : "↓";
+        });
       };
 
       const buildTimerTitle = (element) => {
@@ -756,12 +945,14 @@
 
       const renderDevices = (items) => {
         if (!items.length) {
-          devicesTable.innerHTML = '<tr><td class="empty" colspan="6">No devices found</td></tr>';
+          devicesTable.innerHTML = '<tr><td class="empty" colspan="7">No devices found</td></tr>';
           updateLiveTimers();
           return;
         }
 
-        devicesTable.innerHTML = items
+        const sortedItems = sortDeviceItems(items);
+
+        devicesTable.innerHTML = sortedItems
           .map((item) => {
             return `
               <tr>
@@ -770,25 +961,28 @@
                 <td>${item.hostname || "-"}</td>
                 <td>${buildCommentBadges(item)}</td>
                 <td>${buildSemanticAssignmentBadge(item)}</td>
+                <td>${buildStatusCell(item)}</td>
                 <td>${buildSessionCell(item)}</td>
               </tr>
             `;
           })
           .join("");
+        updateDeviceSortIndicators();
         updateLiveTimers();
       };
 
       const loadDevices = async () => {
-        devicesTable.innerHTML = '<tr><td class="empty" colspan="6">Loading devices...</td></tr>';
+        devicesTable.innerHTML = '<tr><td class="empty" colspan="7">Loading devices...</td></tr>';
         try {
           const response = await fetch("/api/devices", { cache: "no-store" });
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
           }
           const payload = await response.json();
-          renderDevices(payload.items || []);
+          deviceItems = payload.items || [];
+          renderDevices(deviceItems);
         } catch (error) {
-          devicesTable.innerHTML = `<tr><td class="empty" colspan="6">Unable to load devices: ${error}</td></tr>`;
+          devicesTable.innerHTML = `<tr><td class="empty" colspan="7">Unable to load devices: ${error}</td></tr>`;
         }
       };
 
@@ -809,9 +1003,26 @@
 
       devicesRefreshButton.addEventListener("click", loadDevices);
       autoRefreshSelect.addEventListener("change", reconfigureAutoRefresh);
+      deviceSortableHeaders.forEach((header) => {
+        header.addEventListener("click", () => {
+          const key = String(header.dataset.sortKey || "");
+          if (!key) {
+            return;
+          }
+          if (activeDeviceSort.key !== key || !activeDeviceSort.direction) {
+            activeDeviceSort = { key, direction: "asc" };
+          } else if (activeDeviceSort.direction === "asc") {
+            activeDeviceSort = { key, direction: "desc" };
+          } else {
+            activeDeviceSort = { key: null, direction: null };
+          }
+          renderDevices(deviceItems);
+        });
+      });
 
       sortRows();
       setCounts();
+      updateDeviceSortIndicators();
       reconfigureAutoRefresh();
       updateLiveTimers();
       setInterval(updateLiveTimers, 1000);
