@@ -933,6 +933,50 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(snapshot["idle_since"], "2026-04-08T10:05:00+00:00")
         self.assertIsNone(snapshot["offline_since"])
 
+    def test_save_snapshot_previous_offline_with_idle_probe_stays_offline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:51",
+                            "ip_address": "192.168.88.51",
+                            "source": ["arp"],
+                            "arp_status": "failed",
+                            "arp_state": "offline",
+                            "state_changed_at": "2026-04-08T10:21:00+00:00",
+                            "online_since": None,
+                            "idle_since": None,
+                            "offline_since": "2026-04-08T10:21:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T10:24:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:51",
+                            "ip_address": "192.168.88.51",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["arp_state"], "offline")
+        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T10:21:00+00:00")
+        self.assertIsNone(snapshot["online_since"])
+        self.assertIsNone(snapshot["idle_since"])
+        self.assertEqual(snapshot["offline_since"], "2026-04-08T10:21:00+00:00")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
