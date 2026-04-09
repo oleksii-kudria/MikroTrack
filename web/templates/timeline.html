@@ -703,6 +703,28 @@
         return `<span class="badge ${cssClass}${extraClass}" title="${escapeHtml(tooltip || label)}"${extraAttributes}>${escapeHtml(label)}</span>`;
       };
 
+      const VALID_UI_STATES = new Set(["online", "offline", "idle", "unknown"]);
+      const ARP_STATUS_TO_UI_STATE = {
+        reachable: "online",
+        permanent: "online",
+        stale: "idle",
+        unknown: "unknown",
+      };
+      const ARP_STATE_TO_UI_STATE = {
+        online: "online",
+        idle: "idle",
+        offline: "offline",
+        unknown: "unknown",
+      };
+      const uiStateMappingLogCache = new Set();
+      const logUiStateMapping = (message) => {
+        if (uiStateMappingLogCache.has(message)) {
+          return;
+        }
+        uiStateMappingLogCache.add(message);
+        console.debug(message);
+      };
+
       const isRandomMac = (macRaw) => {
         const mac = String(macRaw || "").trim().toUpperCase();
         const parts = mac.split(":");
@@ -780,8 +802,7 @@
       };
 
       const buildStatusMac = (item) => {
-        const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
-        const state = ["online", "offline", "idle", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+        const state = normalizeStatus(item);
         const cls = state === "online"
           ? "status-active"
           : state === "offline"
@@ -795,8 +816,36 @@
       };
 
       const normalizeStatus = (item) => {
-        const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
-        return ["online", "offline", "idle", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+        const mac = String(item.mac || "unknown").trim().toUpperCase() || "UNKNOWN";
+        const normalizedFusedState = String(item.fused_state || "").trim().toLowerCase();
+        if (VALID_UI_STATES.has(normalizedFusedState)) {
+          logUiStateMapping(`UI state mapping: using fused_state=${normalizedFusedState} for MAC ${mac}`);
+          return normalizedFusedState;
+        }
+
+        const normalizedStatus = String(item.status || "").trim().toLowerCase();
+        if (VALID_UI_STATES.has(normalizedStatus)) {
+          logUiStateMapping(`UI fallback mapping used for MAC ${mac}`);
+          return normalizedStatus;
+        }
+
+        const normalizedArpStatus = String(item.arp_status || "").trim().toLowerCase();
+        const mappedArpStatus = ARP_STATUS_TO_UI_STATE[normalizedArpStatus];
+        if (VALID_UI_STATES.has(mappedArpStatus)) {
+          logUiStateMapping(`UI fallback mapping used for MAC ${mac}`);
+          return mappedArpStatus;
+        }
+
+        const normalizedArpState = String(item.arp_state || "").trim().toLowerCase();
+        const mappedArpState = ARP_STATE_TO_UI_STATE[normalizedArpState];
+        if (VALID_UI_STATES.has(mappedArpState)) {
+          logUiStateMapping(`UI fallback mapping used for MAC ${mac}`);
+          return mappedArpState;
+        }
+
+        const activeState = typeof item.active === "boolean" ? (item.active ? "online" : "offline") : "unknown";
+        logUiStateMapping(`UI fallback mapping used for MAC ${mac}`);
+        return activeState;
       };
 
       const resolveAssignment = (item) => {
