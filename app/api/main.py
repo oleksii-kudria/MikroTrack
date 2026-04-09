@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import UTC, datetime
 from ipaddress import ip_address
@@ -12,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from app.arp_logic import fused_device_state, normalize_arp_status
 
 app = FastAPI(title="MikroTrack API", version="0.1.0")
+logger = logging.getLogger("mikrotrack.api")
 
 
 def _persistence_path() -> Path:
@@ -201,6 +203,28 @@ def _arp_flag(has_arp_entry: bool, arp_flags: dict[str, Any]) -> str | None:
     return base_flag
 
 
+def _resolve_api_state(
+    *,
+    mac: str,
+    offline_since: datetime | None,
+    online_since: datetime | None,
+    idle_since: datetime | None,
+    fallback_state: str,
+) -> str:
+    if isinstance(offline_since, datetime):
+        if fallback_state == "idle":
+            logger.info("API state mapping: prevented idle override for MAC %s", mac)
+        logger.info("API state mapping: resolved offline for MAC %s", mac)
+        return "offline"
+    if isinstance(idle_since, datetime) and (
+        not isinstance(online_since, datetime) or idle_since >= online_since
+    ):
+        return "idle"
+    if isinstance(online_since, datetime):
+        return "online"
+    return "unknown"
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -319,7 +343,6 @@ def list_devices() -> dict[str, object]:
         dhcp_flag = _dhcp_flag(has_dhcp_lease, dhcp_flags, dhcp_is_dynamic)
         arp_flag = _arp_flag(has_arp_entry, arp_flags)
         device_state = _device_state(device)
-        active = device_state == "online"
         arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
         arp_state = str(device.get("arp_state", "")).strip().lower() or device_state
         primary_ip = str(device.get("ip_address", ""))
@@ -343,19 +366,28 @@ def list_devices() -> dict[str, object]:
         if not isinstance(offline_since, datetime) and isinstance(session, dict):
             offline_since = session.get("offline_since")
 
+        resolved_state = _resolve_api_state(
+            mac=mac,
+            offline_since=offline_since,
+            online_since=online_since,
+            idle_since=idle_since,
+            fallback_state=device_state,
+        )
+        active = resolved_state == "online"
+
         presence_duration_seconds = (
             max(0, int((now - online_since).total_seconds()))
-            if device_state in {"online", "idle"} and isinstance(online_since, datetime)
+            if resolved_state in {"online", "idle"} and isinstance(online_since, datetime)
             else None
         )
         offline_duration_seconds = (
             max(0, int((now - offline_since).total_seconds()))
-            if device_state == "offline" and isinstance(offline_since, datetime)
+            if resolved_state == "offline" and isinstance(offline_since, datetime)
             else None
         )
         idle_duration_seconds = (
             max(0, int((now - idle_since).total_seconds()))
-            if device_state == "idle" and isinstance(idle_since, datetime)
+            if resolved_state == "idle" and isinstance(idle_since, datetime)
             else None
         )
         elapsed_seconds = presence_duration_seconds or offline_duration_seconds or 0
@@ -382,9 +414,9 @@ def list_devices() -> dict[str, object]:
                     "has_dhcp_lease": has_dhcp_lease,
                     "has_arp_entry": has_arp_entry,
                     "arp_flag": arp_flag,
-                    "state": device_state,
+                    "state": resolved_state,
                 },
-                "status": device_state,
+                "status": resolved_state,
                 "arp_status": arp_status,
                 "arp_state": arp_state,
                 "arp_secondary_count": len(arp_secondary),
