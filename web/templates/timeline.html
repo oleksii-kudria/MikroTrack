@@ -557,6 +557,8 @@
       let refreshTimer = null;
       let deviceItems = [];
       let activeDeviceSort = null;
+      let statusFilter = null;
+      let assignmentFilter = null;
 
       const fmtClock = (value) => {
         const raw = String(value || "").trim();
@@ -697,6 +699,68 @@
       const normalizeStatus = (item) => {
         const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
         return ["online", "offline", "idle", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+      };
+
+      const resolveAssignment = (item) => {
+        const entityType = String(item.entity_type || "client").trim().toLowerCase();
+        if (entityType === "interface") {
+          return "INTERFACE";
+        }
+        if (isRandomMac(item.mac)) {
+          return "RANDOM";
+        }
+
+        const flags = item.flags || {};
+        const arpFlag = String(flags.arp_flag || "").trim().toUpperCase();
+        const dhcpFlag = String(flags.dhcp_flag || "").trim().toUpperCase();
+        const hasDhcpLease = Boolean(dhcpFlag);
+        const dhcpIsDynamic = dhcpFlag === "D";
+        const arpIsStatic = arpFlag.startsWith("S");
+        const dhcpIsStatic = dhcpFlag === "S";
+
+        if (arpIsStatic) {
+          return "PERM";
+        }
+        if (hasDhcpLease && dhcpIsStatic) {
+          return "STATIC";
+        }
+        if (hasDhcpLease && dhcpIsDynamic) {
+          return "DYNAMIC";
+        }
+        if (!hasDhcpLease && arpFlag === "DC") {
+          return "COMPLETE";
+        }
+
+        return null;
+      };
+
+      const setStatusFilter = (value) => {
+        statusFilter = value || null;
+      };
+
+      const setAssignmentFilter = (value) => {
+        assignmentFilter = value || null;
+      };
+
+      const clearDeviceFilters = () => {
+        statusFilter = null;
+        assignmentFilter = null;
+      };
+
+      const applyDeviceFilters = (items) => {
+        return items.filter((item) => {
+          const status = normalizeStatus(item);
+          const assignment = resolveAssignment(item);
+
+          if (statusFilter && status !== statusFilter) {
+            return false;
+          }
+          if (assignmentFilter && assignment !== assignmentFilter) {
+            return false;
+          }
+
+          return true;
+        });
       };
 
       const buildStatusCell = (item) => {
@@ -998,7 +1062,8 @@
           return;
         }
 
-        const sortedItems = sortDeviceItems(items);
+        const filteredItems = applyDeviceFilters(items);
+        const sortedItems = sortDeviceItems(filteredItems);
 
         devicesTable.innerHTML = sortedItems
           .map((item) => {
