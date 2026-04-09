@@ -13,6 +13,7 @@ from app.exceptions import MikroTrackError
 logger = logging.getLogger("mikrotrack")
 _persistence_path = Path("/data/snapshots")
 _retention_days = 7
+_idle_timeout_seconds = 900
 _LOW_DISK_SPACE_THRESHOLD_BYTES = 50 * 1024 * 1024
 _EVENTS_FILENAME = "events.jsonl"
 
@@ -20,10 +21,11 @@ _EVENTS_FILENAME = "events.jsonl"
 Event = dict[str, Any]
 
 
-def configure_persistence(path: str, retention_days: int) -> None:
-    global _persistence_path, _retention_days
+def configure_persistence(path: str, retention_days: int, *, idle_timeout_seconds: int = 900) -> None:
+    global _persistence_path, _retention_days, _idle_timeout_seconds
     _persistence_path = Path(path)
     _retention_days = retention_days
+    _idle_timeout_seconds = idle_timeout_seconds
 
 
 def _read_mount_points() -> set[Path]:
@@ -133,6 +135,37 @@ def _index_devices_by_mac(devices: list[dict[str, Any]]) -> dict[str, dict[str, 
 
 def _iso_timestamp() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _parse_snapshot_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+
+    raw = value.strip()
+    if not raw:
+        return None
+
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=datetime.now().astimezone().tzinfo)
+    return parsed
+
+
+def _idle_timeout_exceeded(*, previous: dict[str, Any], now: datetime) -> bool:
+    idle_since = _parse_snapshot_timestamp(previous.get("idle_since"))
+    if idle_since is None:
+        idle_since = _parse_snapshot_timestamp(previous.get("state_changed_at"))
+    if idle_since is None:
+        return False
+
+    return (now - idle_since).total_seconds() > _idle_timeout_seconds
 
 
 def _source_value(device: dict[str, Any]) -> str:
@@ -347,6 +380,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
 
     previous_by_mac = _index_devices_by_mac(previous_devices)
     now_iso = _iso_timestamp()
+    now_dt = _parse_snapshot_timestamp(now_iso)
     enriched_devices: list[dict[str, Any]] = []
 
     for current in current_devices:
@@ -394,6 +428,22 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         if current_state == "unknown" and _has_presence_evidence(device):
             merge_current_state = previous_state
             decision = "unknown_with_evidence_preserved_previous_state"
+        elif (
+            current_state == "idle"
+            and previous_state == "idle"
+            and isinstance(now_dt, datetime)
+            and _idle_timeout_exceeded(previous=previous, now=now_dt)
+        ):
+            merge_current_state = "offline"
+            device["arp_state"] = "offline"
+            device["fused_state"] = "offline"
+            decision = "idle_timeout_forced_offline"
+            logger.info(
+                "Idle timeout exceeded for MAC %s, forcing state to offline",
+                mac,
+            )
+        elif current_state == "idle" and previous_state == "idle":
+            logger.debug("Device remained idle within timeout for MAC %s", mac)
 
         previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, merge_current_state)
         previous_state_changed_at = previous.get("state_changed_at")
