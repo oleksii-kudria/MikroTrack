@@ -577,12 +577,28 @@
       const badge = (label, cssClass, tooltip) =>
         `<span class="badge ${cssClass}" title="${escapeHtml(tooltip || label)}">${escapeHtml(label)}</span>`;
 
+      const isRandomMac = (macRaw) => {
+        const mac = String(macRaw || "").trim().toUpperCase();
+        const parts = mac.split(":");
+        if (parts.length !== 6) {
+          return false;
+        }
+        const firstOctet = Number.parseInt(parts[0], 16);
+        if (Number.isNaN(firstOctet)) {
+          return false;
+        }
+        return Boolean(firstOctet & 0b00000010);
+      };
+
       const buildSemanticAssignmentBadge = (item) => {
         const entityType = String(item.entity_type || "client").trim().toLowerCase();
         const interfaceName = String(item.interface_name || "").trim();
         if (entityType === "interface") {
           const nameHtml = interfaceName ? ` <span class="badge badge-gray" title="Interface name">${escapeHtml(interfaceName)}</span>` : "";
           return `${badge("INTERFACE", "badge-purple", "Local MikroTik interface MAC")}${nameHtml}`;
+        }
+        if (isRandomMac(item.mac)) {
+          return badge("RANDOM", "badge-orange", "Locally administered MAC (privacy/randomized)");
         }
 
         const flags = item.flags || {};
