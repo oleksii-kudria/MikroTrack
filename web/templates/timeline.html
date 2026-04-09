@@ -556,7 +556,7 @@
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
       let refreshTimer = null;
       let deviceItems = [];
-      let activeDeviceSorts = [];
+      let activeDeviceSort = null;
 
       const fmtClock = (value) => {
         const raw = String(value || "").trim();
@@ -894,18 +894,21 @@
       };
 
       const sortDeviceItems = (items) => {
-        if (!activeDeviceSorts.length) {
+        if (!activeDeviceSort) {
           return [...items];
         }
 
         return items
           .map((item, index) => ({ item, index }))
           .sort((leftWrapped, rightWrapped) => {
-            for (const sortEntry of activeDeviceSorts) {
-              const compared = compareBySortKey(leftWrapped.item, rightWrapped.item, sortEntry.key, sortEntry.direction);
-              if (compared !== 0) {
-                return compared;
-              }
+            const compared = compareBySortKey(
+              leftWrapped.item,
+              rightWrapped.item,
+              activeDeviceSort.key,
+              activeDeviceSort.direction,
+            );
+            if (compared !== 0) {
+              return compared;
             }
             return leftWrapped.index - rightWrapped.index;
           })
@@ -923,21 +926,18 @@
       };
 
       const applySortHeaderClick = (key) => {
-        const sortIndex = activeDeviceSorts.findIndex((entry) => entry.key === key);
-        if (sortIndex < 0) {
-          activeDeviceSorts = [...activeDeviceSorts, { key, direction: "asc" }];
+        if (!activeDeviceSort || activeDeviceSort.key !== key) {
+          activeDeviceSort = { key, direction: "asc" };
           return;
         }
 
-        const nextDirection = cycleDirection(activeDeviceSorts[sortIndex].direction);
+        const nextDirection = cycleDirection(activeDeviceSort.direction);
         if (!nextDirection) {
-          activeDeviceSorts = activeDeviceSorts.filter((entry) => entry.key !== key);
+          activeDeviceSort = null;
           return;
         }
 
-        const updatedSorts = [...activeDeviceSorts];
-        updatedSorts[sortIndex] = { key, direction: nextDirection };
-        activeDeviceSorts = updatedSorts;
+        activeDeviceSort = { key, direction: nextDirection };
       };
 
       const updateDeviceSortIndicators = () => {
@@ -947,14 +947,13 @@
           if (!indicator) {
             return;
           }
-          const sortIndex = activeDeviceSorts.findIndex((entry) => entry.key === key);
-          if (sortIndex < 0) {
+          if (!activeDeviceSort || activeDeviceSort.key !== key) {
             indicator.textContent = "↕";
             return;
           }
-          const direction = activeDeviceSorts[sortIndex].direction;
+          const direction = activeDeviceSort.direction;
           const arrow = direction === "asc" ? "↑" : "↓";
-          indicator.textContent = `${arrow}[${sortIndex + 1}]`;
+          indicator.textContent = arrow;
         });
       };
 
@@ -1052,7 +1051,7 @@
 
       devicesRefreshButton.addEventListener("click", loadDevices);
       devicesClearSortButton.addEventListener("click", () => {
-        activeDeviceSorts = [];
+        activeDeviceSort = null;
         renderDevices(deviceItems);
       });
       autoRefreshSelect.addEventListener("change", reconfigureAutoRefresh);
