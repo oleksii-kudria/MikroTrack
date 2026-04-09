@@ -922,25 +922,8 @@
         return null;
       };
 
-      const applySortHeaderClick = (key, withShift) => {
+      const applySortHeaderClick = (key) => {
         const sortIndex = activeDeviceSorts.findIndex((entry) => entry.key === key);
-        if (!withShift) {
-          if (sortIndex === 0 && activeDeviceSorts.length === 1) {
-            const nextDirection = cycleDirection(activeDeviceSorts[0].direction);
-            activeDeviceSorts = nextDirection ? [{ key, direction: nextDirection }] : [];
-            return;
-          }
-
-          if (sortIndex >= 0) {
-            const nextDirection = cycleDirection(activeDeviceSorts[sortIndex].direction);
-            activeDeviceSorts = nextDirection ? [{ key, direction: nextDirection }] : [];
-            return;
-          }
-
-          activeDeviceSorts = [{ key, direction: "asc" }];
-          return;
-        }
-
         if (sortIndex < 0) {
           activeDeviceSorts = [...activeDeviceSorts, { key, direction: "asc" }];
           return;
@@ -1074,12 +1057,12 @@
       });
       autoRefreshSelect.addEventListener("change", reconfigureAutoRefresh);
       deviceSortableHeaders.forEach((header) => {
-        header.addEventListener("click", (event) => {
+        header.addEventListener("click", () => {
           const key = String(header.dataset.sortKey || "");
           if (!key) {
             return;
           }
-          applySortHeaderClick(key, Boolean(event.shiftKey));
+          applySortHeaderClick(key);
           renderDevices(deviceItems);
         });
       });
