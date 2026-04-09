@@ -684,18 +684,20 @@
       const buildSessionCell = (item) => {
         const state = String(item.status || "").toLowerCase();
         const onlineSinceRaw = String(item.online_since || "").trim();
+        const idleSinceRaw = String(item.idle_since || "").trim();
         const offlineSinceRaw = String(item.offline_since || "").trim();
         const stateChangedRaw = String(item.state_changed_at || "").trim();
         const onlineSince = fmtClock(onlineSinceRaw);
+        const idleSince = fmtClock(idleSinceRaw);
         const offlineSince = fmtClock(offlineSinceRaw);
         const stateChangedAt = fmtClock(item.state_changed_at);
-        const baseDataset = `data-online-since="${escapeHtml(onlineSinceRaw)}" data-offline-since="${escapeHtml(offlineSinceRaw)}" data-state-changed-at="${escapeHtml(stateChangedRaw)}"`;
+        const baseDataset = `data-online-since="${escapeHtml(onlineSinceRaw)}" data-idle-since="${escapeHtml(idleSinceRaw)}" data-offline-since="${escapeHtml(offlineSinceRaw)}" data-state-changed-at="${escapeHtml(stateChangedRaw)}"`;
 
         if (state === "online") {
           return `<div>Online: <strong data-live-timer="true" data-timer-kind="online" data-start-ts="${escapeHtml(onlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Last change: ${stateChangedAt}</div>`;
         }
         if (state === "idle") {
-          return `<div>Online: <strong data-live-timer="true" data-timer-kind="idle" data-start-ts="${escapeHtml(onlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Idle since: ${stateChangedAt}</div>`;
+          return `<div>Idle: <strong data-live-timer="true" data-timer-kind="idle" data-start-ts="${escapeHtml(idleSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Idle since: ${idleSince}</div>`;
         }
         if (state === "offline") {
           return `<div>Offline: <strong data-live-timer="true" data-timer-kind="offline" data-start-ts="${escapeHtml(offlineSinceRaw)}" ${baseDataset}>-</strong></div><div class="muted">Since: ${offlineSince}</div>`;
@@ -706,6 +708,7 @@
       const buildTimerTitle = (element) => {
         const kind = String(element.dataset.timerKind || "").trim();
         const onlineSince = fmtClock(element.dataset.onlineSince);
+        const idleSince = fmtClock(element.dataset.idleSince);
         const offlineSince = fmtClock(element.dataset.offlineSince);
         const stateChangedAt = fmtClock(element.dataset.stateChangedAt);
 
@@ -713,7 +716,7 @@
           return `Online since: ${onlineSince}`;
         }
         if (kind === "idle") {
-          return `Online since: ${onlineSince}\nIdle since: ${stateChangedAt}`;
+          return `Online since: ${onlineSince}\nIdle since: ${idleSince}`;
         }
         if (kind === "offline") {
           return `Offline since: ${offlineSince}`;

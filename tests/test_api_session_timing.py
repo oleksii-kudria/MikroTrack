@@ -24,6 +24,7 @@ class ApiSessionTimingTests(unittest.TestCase):
                             "arp_state": "online",
                             "state_changed_at": "2026-04-08T10:01:00+00:00",
                             "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": None,
                             "offline_since": None,
                         }
                     ]
@@ -37,9 +38,10 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertEqual(item["status"], "online")
         self.assertEqual(item["state_changed_at"], "2026-04-08T10:01:00+00:00")
         self.assertEqual(item["online_since"], "2026-04-08T10:00:00+00:00")
+        self.assertIsNone(item["idle_since"])
         self.assertIsNone(item["offline_since"])
 
-    def test_idle_keeps_online_since_and_uses_state_changed_for_idle_duration(self) -> None:
+    def test_idle_keeps_online_since_and_uses_idle_since_for_idle_duration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["PERSISTENCE_PATH"] = tmp
             Path(tmp, "2026-04-08T10-10-00.json").write_text(
@@ -88,6 +90,7 @@ class ApiSessionTimingTests(unittest.TestCase):
 
         self.assertEqual(item["status"], "idle")
         self.assertEqual(item["online_since"], "2026-04-08T10:00:00+00:00")
+        self.assertEqual(item["idle_since"], "2026-04-08T10:05:00+00:00")
         self.assertEqual(item["state_changed_at"], "2026-04-08T10:05:00+00:00")
         self.assertIsNone(item["offline_since"])
         self.assertIsInstance(item["presence_duration_seconds"], int)
@@ -143,6 +146,7 @@ class ApiSessionTimingTests(unittest.TestCase):
 
         self.assertEqual(item["status"], "offline")
         self.assertIsNone(item["online_since"])
+        self.assertIsNone(item["idle_since"])
         self.assertEqual(item["offline_since"], "2026-04-08T10:12:00+00:00")
         self.assertEqual(item["state_changed_at"], "2026-04-08T10:12:00+00:00")
         self.assertIsInstance(item["offline_duration_seconds"], int)
@@ -163,6 +167,7 @@ class ApiSessionTimingTests(unittest.TestCase):
                             "arp_state": "online",
                             "state_changed_at": None,
                             "online_since": None,
+                            "idle_since": None,
                             "offline_since": None,
                         }
                     ]
@@ -175,6 +180,7 @@ class ApiSessionTimingTests(unittest.TestCase):
 
         self.assertIsNone(item["state_changed_at"])
         self.assertIsNone(item["online_since"])
+        self.assertIsNone(item["idle_since"])
         self.assertIsNone(item["offline_since"])
         self.assertIsNone(item["presence_duration_seconds"])
 

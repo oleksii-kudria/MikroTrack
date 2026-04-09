@@ -360,20 +360,24 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         device = dict(current)
         device.setdefault("state_changed_at", None)
         device.setdefault("online_since", None)
+        device.setdefault("idle_since", None)
         device.setdefault("offline_since", None)
 
         if previous is None:
             if current_state in {"online", "idle"}:
                 device["state_changed_at"] = now_iso
                 device["online_since"] = now_iso
+                device["idle_since"] = now_iso if current_state == "idle" else None
                 device["offline_since"] = None
             elif current_state == "offline":
                 device["state_changed_at"] = now_iso
                 device["offline_since"] = now_iso
                 device["online_since"] = None
+                device["idle_since"] = None
             else:
                 device["state_changed_at"] = None
                 device["online_since"] = None
+                device["idle_since"] = None
                 device["offline_since"] = None
             _initialize_missing_session_timestamps(
                 device=device,
@@ -394,6 +398,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, merge_current_state)
         previous_state_changed_at = previous.get("state_changed_at")
         previous_online_since = previous.get("online_since")
+        previous_idle_since = previous.get("idle_since")
         previous_offline_since = previous.get("offline_since")
         previous_source = _source_value(previous)
         current_source = _source_value(device)
@@ -413,18 +418,22 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
 
             if previous_presence_state == "offline" and current_presence_state in {"online", "idle"}:
                 device["online_since"] = now_iso
+                device["idle_since"] = now_iso if current_presence_state == "idle" else None
                 device["offline_since"] = None
                 decision = "transition_offline_to_online"
             elif previous_presence_state in {"online", "idle"} and current_presence_state == "offline":
                 device["online_since"] = None
+                device["idle_since"] = None
                 device["offline_since"] = now_iso
                 decision = "transition_online_to_offline"
             elif previous_presence_state in {"online", "idle"} and current_presence_state in {"online", "idle"}:
                 device["online_since"] = previous_online_since
+                device["idle_since"] = now_iso if current_presence_state == "idle" else None
                 device["offline_since"] = None
                 decision = "transition_online_idle"
             else:
                 device["online_since"] = previous_online_since
+                device["idle_since"] = previous_idle_since
                 device["offline_since"] = previous_offline_since
                 decision = "transition_other"
 
@@ -438,6 +447,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
                 "old_online_since=%s new_online_since=%s "
+                "old_idle_since=%s new_idle_since=%s "
                 "old_offline_since=%s new_offline_since=%s "
                 "old_state_changed_at=%s new_state_changed_at=%s decision=%s",
                 mac,
@@ -447,6 +457,8 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 changed_fields,
                 previous_online_since,
                 device.get("online_since"),
+                previous_idle_since,
+                device.get("idle_since"),
                 previous_offline_since,
                 device.get("offline_since"),
                 previous_state_changed_at,
@@ -460,12 +472,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device["state_changed_at"] = now_iso
             if merge_current_state in {"online", "idle"}:
                 device["online_since"] = previous_online_since
+                device["idle_since"] = previous_idle_since if merge_current_state == "idle" else None
                 device["offline_since"] = None
             elif merge_current_state == "offline":
                 device["online_since"] = None
+                device["idle_since"] = None
                 device["offline_since"] = previous_offline_since
             else:
                 device["online_since"] = previous_online_since
+                device["idle_since"] = previous_idle_since
                 device["offline_since"] = previous_offline_since
             _initialize_missing_session_timestamps(
                 device=device,
@@ -476,6 +491,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
                 "old_online_since=%s new_online_since=%s "
+                "old_idle_since=%s new_idle_since=%s "
                 "old_offline_since=%s new_offline_since=%s "
                 "old_state_changed_at=%s new_state_changed_at=%s decision=%s",
                 mac,
@@ -485,6 +501,8 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 changed_fields,
                 previous_online_since,
                 device.get("online_since"),
+                previous_idle_since,
+                device.get("idle_since"),
                 previous_offline_since,
                 device.get("offline_since"),
                 previous_state_changed_at,
@@ -498,12 +516,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device["state_changed_at"] = previous_state_changed_at
             if merge_current_state in {"online", "idle"}:
                 device["online_since"] = previous_online_since
+                device["idle_since"] = previous_idle_since if merge_current_state == "idle" else None
                 device["offline_since"] = None
             elif merge_current_state == "offline":
                 device["online_since"] = None
+                device["idle_since"] = None
                 device["offline_since"] = previous_offline_since
             else:
                 device["online_since"] = previous_online_since
+                device["idle_since"] = previous_idle_since
                 device["offline_since"] = previous_offline_since
             _initialize_missing_session_timestamps(
                 device=device,
@@ -514,6 +535,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
                 "old_online_since=%s new_online_since=%s "
+                "old_idle_since=%s new_idle_since=%s "
                 "old_offline_since=%s new_offline_since=%s "
                 "old_state_changed_at=%s new_state_changed_at=%s decision=%s",
                 mac,
@@ -523,6 +545,8 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 changed_fields,
                 previous_online_since,
                 device.get("online_since"),
+                previous_idle_since,
+                device.get("idle_since"),
                 previous_offline_since,
                 device.get("offline_since"),
                 previous_state_changed_at,
@@ -543,6 +567,7 @@ def _initialize_missing_session_timestamps(
     mac: str,
 ) -> None:
     initialized_online_since = False
+    initialized_idle_since = False
     initialized_offline_since = False
     initialized_state_changed_at = False
 
@@ -550,21 +575,29 @@ def _initialize_missing_session_timestamps(
         device["online_since"] = now_iso
         initialized_online_since = True
 
+    if presence_state == "idle" and not device.get("idle_since"):
+        device["idle_since"] = now_iso
+        initialized_idle_since = True
+
+    if presence_state != "idle":
+        device["idle_since"] = None
+
     if presence_state == "offline" and not device.get("offline_since"):
         device["offline_since"] = now_iso
         initialized_offline_since = True
 
-    if (initialized_online_since or initialized_offline_since) and not device.get("state_changed_at"):
+    if (initialized_online_since or initialized_idle_since or initialized_offline_since) and not device.get("state_changed_at"):
         device["state_changed_at"] = now_iso
         initialized_state_changed_at = True
 
-    if initialized_online_since or initialized_offline_since or initialized_state_changed_at:
+    if initialized_online_since or initialized_idle_since or initialized_offline_since or initialized_state_changed_at:
         logger.debug(
             "session timestamp initialized: mac=%s state=%s online_since_initialized=%s "
-            "offline_since_initialized=%s state_changed_at_initialized=%s",
+            "idle_since_initialized=%s offline_since_initialized=%s state_changed_at_initialized=%s",
             mac,
             presence_state,
             initialized_online_since,
+            initialized_idle_since,
             initialized_offline_since,
             initialized_state_changed_at,
         )
