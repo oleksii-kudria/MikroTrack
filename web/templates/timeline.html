@@ -965,11 +965,13 @@
         const offlineSinceRaw = String(item.offline_since || "").trim();
         const stateChangedRaw = String(item.state_changed_at || "").trim();
         const normalizedState = ["online", "idle", "offline", "unknown"].includes(state) ? state : "unknown";
+        if (normalizedState === "unknown") {
+          return `<strong class="session-timer session-timer-unknown" title="State is unknown">-</strong>`;
+        }
         const startByState = {
           online: onlineSinceRaw,
           idle: idleSinceRaw,
           offline: offlineSinceRaw,
-          unknown: stateChangedRaw,
         };
         const timerClassByState = {
           online: "session-timer-online",
@@ -985,11 +987,13 @@
 
       const readStateTimestampMs = (item) => {
         const state = normalizeStatus(item);
+        if (state === "unknown") {
+          return null;
+        }
         const byState = {
           online: item.online_since,
           idle: item.idle_since,
           offline: item.offline_since,
-          unknown: item.state_changed_at,
         };
         return parseTimestampMs(byState[state] || item.state_changed_at);
       };
@@ -1068,11 +1072,26 @@
         return null;
       };
 
-      const statusPriority = {
+      const statusGroupPriority = {
         online: 0,
         idle: 1,
-        unknown: 2,
-        offline: 3,
+        offline: 2,
+        unknown: 3,
+      };
+
+      const statusSortPriority = {
+        asc: {
+          online: 0,
+          idle: 1,
+          offline: 2,
+          unknown: 3,
+        },
+        desc: {
+          offline: 0,
+          idle: 1,
+          online: 2,
+          unknown: 3,
+        },
       };
 
       const compareBySortKey = (left, right, key, direction) => {
@@ -1083,10 +1102,11 @@
         if (key === "status") {
           const leftStatus = normalizeStatus(left);
           const rightStatus = normalizeStatus(right);
-          const leftPriority = statusPriority[leftStatus] ?? 99;
-          const rightPriority = statusPriority[rightStatus] ?? 99;
+          const directionPriority = statusSortPriority[direction] || statusSortPriority.asc;
+          const leftPriority = directionPriority[leftStatus] ?? 99;
+          const rightPriority = directionPriority[rightStatus] ?? 99;
           if (leftPriority !== rightPriority) {
-            return direction === "asc" ? leftPriority - rightPriority : rightPriority - leftPriority;
+            return leftPriority - rightPriority;
           }
 
           const leftTs = readStateTimestampMs(left);
@@ -1122,13 +1142,21 @@
       };
 
       const sortDeviceItems = (items) => {
-        if (!activeDeviceSort) {
-          return [...items];
-        }
-
         return items
           .map((item, index) => ({ item, index }))
           .sort((leftWrapped, rightWrapped) => {
+            const leftStatus = normalizeStatus(leftWrapped.item);
+            const rightStatus = normalizeStatus(rightWrapped.item);
+            const leftGroupPriority = statusGroupPriority[leftStatus] ?? 99;
+            const rightGroupPriority = statusGroupPriority[rightStatus] ?? 99;
+            if (leftGroupPriority !== rightGroupPriority) {
+              return leftGroupPriority - rightGroupPriority;
+            }
+
+            if (!activeDeviceSort) {
+              return leftWrapped.index - rightWrapped.index;
+            }
+
             const compared = compareBySortKey(
               leftWrapped.item,
               rightWrapped.item,
