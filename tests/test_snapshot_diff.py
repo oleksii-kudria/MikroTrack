@@ -5,6 +5,7 @@ import logging
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from app.persistence import configure_persistence, process_snapshot_diff, save_snapshot
 
@@ -844,6 +845,93 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(online_snapshot["online_since"], "2026-04-08T10:00:00+00:00")
         self.assertIsNone(online_snapshot["idle_since"])
         self.assertIsNone(online_snapshot["offline_since"])
+
+    def test_save_snapshot_idle_timeout_forces_offline_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:49",
+                            "ip_address": "192.168.88.49",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                            "state_changed_at": "2026-04-08T10:05:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": "2026-04-08T10:05:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T10:21:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:49",
+                            "ip_address": "192.168.88.49",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["arp_state"], "offline")
+        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T10:21:00+00:00")
+        self.assertIsNone(snapshot["online_since"])
+        self.assertIsNone(snapshot["idle_since"])
+        self.assertEqual(snapshot["offline_since"], "2026-04-08T10:21:00+00:00")
+
+    def test_save_snapshot_idle_within_timeout_preserves_online_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:50",
+                            "ip_address": "192.168.88.50",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                            "state_changed_at": "2026-04-08T10:05:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": "2026-04-08T10:05:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T10:19:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:50",
+                            "ip_address": "192.168.88.50",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["arp_state"], "idle")
+        self.assertEqual(snapshot["online_since"], "2026-04-08T10:00:00+00:00")
+        self.assertEqual(snapshot["idle_since"], "2026-04-08T10:05:00+00:00")
+        self.assertIsNone(snapshot["offline_since"])
 
 
 if __name__ == "__main__":

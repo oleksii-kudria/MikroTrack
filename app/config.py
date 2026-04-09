@@ -17,6 +17,7 @@ class Config:
     persistence_enabled: bool = True
     persistence_path: str = "/data/snapshots"
     persistence_retention_days: int = 7
+    idle_timeout_seconds: int = 900
     api_enabled: bool = True
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -94,6 +95,10 @@ def load_config() -> Config:
         persistence_retention_days=_parse_non_negative_int(
             os.getenv("PERSISTENCE_RETENTION_DAYS", "7"),
             variable_name="PERSISTENCE_RETENTION_DAYS",
+        ),
+        idle_timeout_seconds=_parse_positive_int(
+            os.getenv("IDLE_TIMEOUT_SECONDS", "900"),
+            variable_name="IDLE_TIMEOUT_SECONDS",
         ),
         api_enabled=str_to_bool(os.getenv("API_ENABLED", "true")),
         api_host=os.getenv("API_HOST", "0.0.0.0").strip() or "0.0.0.0",

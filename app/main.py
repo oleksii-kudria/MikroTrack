@@ -113,7 +113,8 @@ def main() -> None:
             "Loaded config: host=%s, port=%s, username=%s, use_ssl=%s, "
             "ssl_verify=%s, log_level=%s, print_result_to_stdout=%s, "
             "run_mode=%s, collection_interval=%ss, persistence_enabled=%s, "
-            "persistence_path=%s, persistence_retention_days=%s, api_enabled=%s, api_host=%s, api_port=%s, backend_api_url=%s"
+            "persistence_path=%s, persistence_retention_days=%s, idle_timeout_seconds=%s, "
+            "api_enabled=%s, api_host=%s, api_port=%s, backend_api_url=%s"
         ),
         config.mikrotik_host,
         config.mikrotik_port,
@@ -127,6 +128,7 @@ def main() -> None:
         config.persistence_enabled,
         config.persistence_path,
         config.persistence_retention_days,
+        config.idle_timeout_seconds,
         config.api_enabled,
         config.api_host,
         config.api_port,
@@ -137,6 +139,7 @@ def main() -> None:
         configure_persistence(
             config.persistence_path,
             config.persistence_retention_days,
+            idle_timeout_seconds=config.idle_timeout_seconds,
         )
         validate_persistence()
 
