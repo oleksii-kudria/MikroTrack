@@ -644,6 +644,7 @@
       const devicesStatsLine = document.getElementById("devices-stats-line");
       let refreshTimer = null;
       let deviceItems = [];
+      const deviceRowCache = new Map();
       let activeDeviceSort = null;
       let statusFilter = null;
       let assignmentFilter = null;
@@ -1190,51 +1191,138 @@
         });
       };
 
-      const renderDevices = (items) => {
-        const filteredItems = applyDeviceFilters(items);
+      const getDeviceMacKey = (item) => String(item.mac || "").trim().toUpperCase();
+
+      const createEmptyRow = (message) => {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.className = "empty";
+        cell.colSpan = 7;
+        cell.textContent = message;
+        row.appendChild(cell);
+        return row;
+      };
+
+      const renderDeviceRowCells = (item) => [
+        buildStatusMac(item),
+        buildIpCell(item),
+        escapeHtml(item.hostname || "-"),
+        buildCommentBadges(item),
+        buildSemanticAssignmentBadge(item),
+        buildStatusCell(item),
+        buildSessionCell(item),
+      ];
+
+      const createDeviceRow = (item) => {
+        const row = document.createElement("tr");
+        row.dataset.mac = getDeviceMacKey(item);
+        renderDeviceRowCells(item).forEach((cellHtml) => {
+          const cell = document.createElement("td");
+          cell.innerHTML = cellHtml;
+          row.appendChild(cell);
+        });
+        return row;
+      };
+
+      const updateDeviceRow = (row, item) => {
+        const nextCells = renderDeviceRowCells(item);
+        if (row.children.length !== nextCells.length) {
+          const rebuilt = createDeviceRow(item);
+          row.replaceChildren(...Array.from(rebuilt.children));
+          row.dataset.mac = getDeviceMacKey(item);
+          return;
+        }
+
+        nextCells.forEach((cellHtml, index) => {
+          const cell = row.children[index];
+          if (cell.innerHTML !== cellHtml) {
+            cell.innerHTML = cellHtml;
+          }
+        });
+        row.dataset.mac = getDeviceMacKey(item);
+      };
+
+      const renderDevicesView = () => {
+        deviceRowCache.forEach((cached) => {
+          updateDeviceRow(cached.row, cached.item);
+        });
+
+        const filteredItems = applyDeviceFilters(deviceItems);
         updateDevicesStats(filteredItems);
 
         if (!filteredItems.length) {
-          devicesTable.innerHTML = '<tr><td class="empty" colspan="7">No devices found</td></tr>';
+          devicesTable.replaceChildren(createEmptyRow("No devices found"));
           updateActiveFiltersUI();
+          updateDeviceSortIndicators();
           updateLiveTimers();
           return;
         }
 
         const sortedItems = sortDeviceItems(filteredItems);
-
-        devicesTable.innerHTML = sortedItems
-          .map((item) => {
-            return `
-              <tr>
-                <td>${buildStatusMac(item)}</td>
-                <td>${buildIpCell(item)}</td>
-                <td>${item.hostname || "-"}</td>
-                <td>${buildCommentBadges(item)}</td>
-                <td>${buildSemanticAssignmentBadge(item)}</td>
-                <td>${buildStatusCell(item)}</td>
-                <td>${buildSessionCell(item)}</td>
-              </tr>
-            `;
-          })
-          .join("");
+        const orderedRows = sortedItems
+          .map((item) => deviceRowCache.get(getDeviceMacKey(item)))
+          .filter(Boolean)
+          .map((entry) => entry.row);
+        devicesTable.replaceChildren(...orderedRows);
         updateActiveFiltersUI();
         updateDeviceSortIndicators();
         updateLiveTimers();
       };
 
+      const reconcileDevices = (items) => {
+        const nextItems = [];
+        const nextMacs = new Set();
+
+        items.forEach((item) => {
+          const mac = getDeviceMacKey(item);
+          if (!mac || nextMacs.has(mac)) {
+            return;
+          }
+          nextMacs.add(mac);
+          nextItems.push(item);
+          const cached = deviceRowCache.get(mac);
+          if (!cached) {
+            deviceRowCache.set(mac, {
+              row: createDeviceRow(item),
+              item,
+            });
+            return;
+          }
+
+          updateDeviceRow(cached.row, item);
+          cached.item = item;
+        });
+
+        Array.from(deviceRowCache.keys()).forEach((mac) => {
+          if (nextMacs.has(mac)) {
+            return;
+          }
+          const cached = deviceRowCache.get(mac);
+          if (cached && cached.row.parentNode) {
+            cached.row.remove();
+          }
+          deviceRowCache.delete(mac);
+        });
+
+        deviceItems = nextItems;
+        renderDevicesView();
+      };
+
       const loadDevices = async () => {
-        devicesTable.innerHTML = '<tr><td class="empty" colspan="7">Loading devices...</td></tr>';
+        if (!deviceItems.length) {
+          devicesTable.replaceChildren(createEmptyRow("Loading devices..."));
+        }
         try {
           const response = await fetch("/api/devices", { cache: "no-store" });
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
           }
           const payload = await response.json();
-          deviceItems = payload.items || [];
-          renderDevices(deviceItems);
+          reconcileDevices(Array.isArray(payload.items) ? payload.items : []);
         } catch (error) {
-          devicesTable.innerHTML = `<tr><td class="empty" colspan="7">Unable to load devices: ${error}</td></tr>`;
+          if (!deviceItems.length) {
+            devicesTable.replaceChildren(createEmptyRow(`Unable to load devices: ${error}`));
+          }
         }
       };
 
@@ -1256,11 +1344,11 @@
       devicesRefreshButton.addEventListener("click", loadDevices);
       devicesClearSortButton.addEventListener("click", () => {
         activeDeviceSort = null;
-        renderDevices(deviceItems);
+        renderDevicesView();
       });
       clearDeviceFiltersButton.addEventListener("click", () => {
         clearDeviceFilters();
-        renderDevices(deviceItems);
+        renderDevicesView();
       });
       autoRefreshSelect.addEventListener("change", reconfigureAutoRefresh);
       devicesTable.addEventListener("click", (event) => {
@@ -1281,7 +1369,7 @@
           } else {
             setStatusFilter(filterValue);
           }
-          renderDevices(deviceItems);
+          renderDevicesView();
           return;
         }
 
@@ -1291,7 +1379,7 @@
           } else {
             setAssignmentFilter(filterValue);
           }
-          renderDevices(deviceItems);
+          renderDevicesView();
         }
       });
       devicesTable.addEventListener("keydown", (event) => {
@@ -1312,7 +1400,7 @@
             return;
           }
           applySortHeaderClick(key);
-          renderDevices(deviceItems);
+          renderDevicesView();
         });
       });
 
