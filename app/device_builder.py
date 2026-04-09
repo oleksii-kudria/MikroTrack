@@ -22,6 +22,21 @@ def _normalize_mac(mac_raw: Any) -> str:
     return str(mac_raw or "").strip().upper()
 
 
+def _is_random_mac(mac_raw: Any) -> bool:
+    mac_text = _normalize_mac(mac_raw)
+    parts = mac_text.split(":")
+    if len(parts) != 6:
+        return False
+
+    try:
+        first_octet = int(parts[0], 16)
+    except ValueError:
+        return False
+
+    # Locally administered bit (bit1, where bit0 is multicast bit)
+    return bool(first_octet & 0b00000010)
+
+
 def _is_link_local(ip_raw: str) -> bool:
     ip_text = str(ip_raw or "").strip()
     if not ip_text:
@@ -294,7 +309,9 @@ def build_devices(
             fused_state,
         )
         badges: list[str] = []
-        if arp_status == "permanent":
+        if _is_random_mac(device.get("mac_address", "")):
+            badges.append("RANDOM")
+        elif arp_status == "permanent":
             badges.append("PERM")
         if _is_link_local(str(device.get("ip_address", ""))):
             badges.append("LINK-LOCAL")

@@ -4,7 +4,7 @@ import unittest
 
 from app.api.main import _arp_flag, _device_state, _dhcp_flag
 from app.collector import get_arp_entries, get_bridge_hosts, get_dhcp_leases, get_interface_macs
-from app.device_builder import build_devices
+from app.device_builder import _is_random_mac, build_devices
 
 
 class _FakeResource:
@@ -248,6 +248,36 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertEqual(devices[0]["entity_type"], "interface")
         self.assertEqual(devices[0]["interface_name"], "ether3")
         self.assertIn("INTERFACE", devices[0]["badges"])
+
+    def test_random_mac_detection_uses_locally_administered_bit(self) -> None:
+        self.assertTrue(_is_random_mac("02:11:22:33:44:55"))
+        self.assertTrue(_is_random_mac("da:11:22:33:44:55"))
+        self.assertFalse(_is_random_mac("00:11:22:33:44:55"))
+        self.assertFalse(_is_random_mac("invalid"))
+
+    def test_builder_uses_random_badge_with_highest_priority(self) -> None:
+        devices = build_devices(
+            dhcp=[
+                {
+                    "mac_address": "02:11:22:33:44:55",
+                    "ip_address": "192.168.88.10",
+                    "status": "bound",
+                    "dynamic": False,
+                }
+            ],
+            arp=[
+                {
+                    "mac_address": "02:11:22:33:44:55",
+                    "ip_address": "192.168.88.10",
+                    "status": "permanent",
+                    "dynamic": False,
+                    "complete": False,
+                }
+            ],
+        )
+
+        self.assertIn("RANDOM", devices[0]["badges"])
+        self.assertNotIn("PERM", devices[0]["badges"])
 
 
 if __name__ == "__main__":
