@@ -101,25 +101,6 @@
 
       .devices-toolbar {
         display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .devices-topbar {
-        display: flex;
-        justify-content: flex-end;
-      }
-
-      .devices-stats {
-        display: inline-flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 10px;
-      }
-
-      .devices-stats-line {
-        font-size: 0.88rem;
-        color: var(--muted);
       }
 
       .devices-controls {
@@ -128,26 +109,42 @@
         justify-content: space-between;
         gap: 10px;
         min-width: 0;
+        width: 100%;
+        flex-wrap: nowrap;
+        padding: 2px 0;
+      }
+
+      .toolbar-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .toolbar-divider {
+        color: #cbd5e1;
+        user-select: none;
+      }
+
+      .devices-stats-line {
+        font-size: 0.88rem;
+        color: var(--muted);
+        white-space: nowrap;
       }
 
       .active-filters {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         min-width: 0;
-      }
-
-      .active-filters-label {
-        color: var(--muted);
-        font-size: 0.88rem;
       }
 
       .active-filters-chips {
         display: inline-flex;
         gap: 6px;
         align-items: center;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
       }
 
       .refresh-controls {
@@ -155,19 +152,6 @@
         gap: 8px;
         align-items: center;
         flex-wrap: nowrap;
-      }
-
-      .display-mode-control {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.8rem;
-        padding: 4px 8px;
-      }
-
-      .display-mode-control select {
-        padding: 6px 8px;
-        font-size: 0.8rem;
       }
 
       .icon-btn {
@@ -186,16 +170,91 @@
         align-items: center;
         gap: 6px;
         font-size: 0.8rem;
-        padding: 4px 8px;
         user-select: none;
       }
 
       .auto-refresh-toggle input {
-        margin: 0;
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
       }
 
       .auto-refresh-toggle-text {
         font-weight: 600;
+        color: #1e3a8a;
+      }
+
+      .mode-segmented {
+        display: inline-flex;
+        border: 1px solid #bfdbfe;
+        border-radius: 999px;
+        padding: 2px;
+        background: #eff6ff;
+      }
+
+      .mode-segment {
+        border: none;
+        background: transparent;
+        color: #1e3a8a;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .mode-segment.active {
+        background: #2563eb;
+        color: #fff;
+      }
+
+      .clear-filters-btn {
+        border: none;
+        background: transparent;
+        color: #475569;
+        padding: 4px 6px;
+        font-size: 0.82rem;
+      }
+
+      .clear-filters-btn:hover {
+        color: #1d4ed8;
+        background: #eff6ff;
+      }
+
+      .toggle-switch {
+        width: 38px;
+        height: 22px;
+        border-radius: 999px;
+        background: #cbd5e1;
+        position: relative;
+        transition: background 0.16s ease;
+      }
+
+      .toggle-switch::after {
+        content: "";
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        transition: transform 0.16s ease;
+      }
+
+      .auto-refresh-toggle input:checked + .toggle-switch {
+        background: #2563eb;
+      }
+
+      .auto-refresh-toggle input:checked + .toggle-switch::after {
+        transform: translateX(16px);
+      }
+
+      .toggle-state {
+        min-width: 25px;
+        font-size: 0.72rem;
+        font-weight: 700;
         color: #1e3a8a;
       }
 
@@ -448,9 +507,13 @@
           flex-wrap: wrap;
         }
 
-        .refresh-controls {
+        .toolbar-divider {
+          display: none;
+        }
+
+        .toolbar-group {
           width: 100%;
-          justify-content: flex-end;
+          flex-wrap: wrap;
         }
       }
 
@@ -547,31 +610,31 @@
 
       <section id="devices-panel" class="panel">
         <div class="devices-toolbar">
-          <div class="devices-topbar">
-            <div class="devices-stats">
-              <span id="devices-stats-line" class="devices-stats-line">Devices: 0 | 🟢 0 | 🟡 0 | ⚪ 0 | 🔴 0</span>
-            </div>
-          </div>
           <div class="devices-controls">
-            <div id="active-filters" class="active-filters hidden" aria-live="polite">
-              <span class="active-filters-label">Active filters:</span>
+            <div class="toolbar-group">
+              <div id="active-filters" class="active-filters hidden" aria-live="polite">
               <span id="active-filters-chips" class="active-filters-chips"></span>
-              <button id="clear-device-filters" type="button">Clear ✕</button>
+                <button id="clear-device-filters" class="clear-filters-btn" type="button">Clear ✕</button>
+              </div>
             </div>
-            <div class="refresh-controls">
-              <button id="devices-clear-sort" class="icon-btn" type="button" title="Clear sorting" aria-label="Clear sorting">⇅</button>
-              <button id="devices-refresh" class="icon-btn" type="button" title="Refresh now" aria-label="Refresh now">↻</button>
-              <label class="stat display-mode-control" for="display-mode" title="Show only end devices (hide BRIDGE, COMPLETE, INTERFACE, unknown)">
-                <span>Mode</span>
-                <select id="display-mode" aria-label="Devices display mode">
-                  <option value="end_devices" selected>End devices</option>
-                  <option value="all">All</option>
-                </select>
-              </label>
-              <label class="stat auto-refresh-toggle" for="auto-refresh" title="Toggle auto refresh">
+            <span class="toolbar-divider" aria-hidden="true">|</span>
+            <div class="toolbar-group refresh-controls">
+              <button id="devices-clear-sort" class="icon-btn" type="button" title="Sort" aria-label="Sort">⇅</button>
+              <button id="devices-refresh" class="icon-btn" type="button" title="Refresh" aria-label="Refresh">↻</button>
+            </div>
+            <span class="toolbar-divider" aria-hidden="true">|</span>
+            <div class="toolbar-group">
+              <div class="mode-segmented" role="tablist" aria-label="Devices display mode">
+                <button id="display-mode-end" class="mode-segment active" data-mode="end_devices" type="button" role="tab" aria-selected="true">End</button>
+                <button id="display-mode-all" class="mode-segment" data-mode="all" type="button" role="tab" aria-selected="false">All</button>
+              </div>
+              <label class="auto-refresh-toggle" for="auto-refresh" title="Toggle auto refresh">
                 <span class="auto-refresh-toggle-text">Auto</span>
                 <input id="auto-refresh" type="checkbox" checked aria-label="Auto refresh" />
+                <span class="toggle-switch" aria-hidden="true"></span>
+                <span id="auto-refresh-state" class="toggle-state">ON</span>
               </label>
+              <span id="devices-stats-line" class="devices-stats-line">0 | 🟢0 🟡0 🟣0 🔴0</span>
             </div>
           </div>
         </div>
@@ -684,13 +747,14 @@
       const devicesTable = document.getElementById("devices-table");
       const deviceSortableHeaders = Array.from(document.querySelectorAll("#devices-panel th.sortable"));
       const autoRefreshToggle = document.getElementById("auto-refresh");
-      const displayModeSelect = document.getElementById("display-mode");
+      const displayModeButtons = Array.from(document.querySelectorAll(".mode-segment"));
       const devicesRefreshButton = document.getElementById("devices-refresh");
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
       const clearDeviceFiltersButton = document.getElementById("clear-device-filters");
       const activeFiltersBlock = document.getElementById("active-filters");
       const activeFiltersChips = document.getElementById("active-filters-chips");
       const devicesStatsLine = document.getElementById("devices-stats-line");
+      const autoRefreshState = document.getElementById("auto-refresh-state");
       let refreshTimer = null;
       let deviceItems = [];
       const deviceRowCache = new Map();
@@ -918,10 +982,17 @@
 
         const chips = [];
         if (hasStatus) {
-          chips.push(`<span class="badge badge-blue">Status: ${escapeHtml(statusFilter)}</span>`);
+          const statusMap = {
+            online: { icon: "🟢", className: "badge-green", label: "Online" },
+            idle: { icon: "🟡", className: "badge-yellow", label: "Idle" },
+            unknown: { icon: "🟣", className: "badge-purple", label: "Unknown" },
+            offline: { icon: "🔴", className: "badge-red", label: "Offline" },
+          };
+          const config = statusMap[statusFilter] || { icon: "•", className: "badge-blue", label: statusFilter };
+          chips.push(`<span class="badge ${config.className}">${config.icon} ${escapeHtml(config.label)}</span>`);
         }
         if (hasAssignment) {
-          chips.push(`<span class="badge badge-purple">Assignment: ${escapeHtml(assignmentFilter)}</span>`);
+          chips.push(`<span class="badge badge-purple">🎯 ${escapeHtml(assignmentFilter)}</span>`);
         }
         activeFiltersChips.innerHTML = chips.join("");
       };
@@ -939,7 +1010,15 @@
             stats[state] += 1;
           }
         });
-        devicesStatsLine.textContent = `Devices: ${items.length} | 🟢 ${stats.online} | 🟡 ${stats.idle} | ⚪ ${stats.unknown} | 🔴 ${stats.offline}`;
+        devicesStatsLine.textContent = `${items.length} | 🟢${stats.online} 🟡${stats.idle} 🟣${stats.unknown} 🔴${stats.offline}`;
+      };
+
+      const updateDisplayModeUI = () => {
+        displayModeButtons.forEach((button) => {
+          const active = button.dataset.mode === displayMode;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-selected", active ? "true" : "false");
+        });
       };
 
       const applyDeviceFilters = (items) => {
@@ -1457,6 +1536,7 @@
             }
           }, 10000);
         }
+        autoRefreshState.textContent = autoRefreshToggle.checked ? "ON" : "OFF";
       };
 
       devicesRefreshButton.addEventListener("click", loadDevices);
@@ -1469,9 +1549,12 @@
         renderDevicesView();
       });
       autoRefreshToggle.addEventListener("change", reconfigureAutoRefresh);
-      displayModeSelect.addEventListener("change", () => {
-        displayMode = displayModeSelect.value === "all" ? "all" : "end_devices";
-        renderDevicesView();
+      displayModeButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          displayMode = button.dataset.mode === "all" ? "all" : "end_devices";
+          updateDisplayModeUI();
+          renderDevicesView();
+        });
       });
       devicesTable.addEventListener("click", (event) => {
         const target = event.target.closest("[data-filter-type]");
@@ -1529,6 +1612,7 @@
       sortRows();
       setCounts();
       updateDeviceSortIndicators();
+      updateDisplayModeUI();
       reconfigureAutoRefresh();
       loadDevices();
       updateLiveTimers();
