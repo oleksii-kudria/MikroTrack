@@ -43,7 +43,7 @@ class DeviceFlagRenderingTests(unittest.TestCase):
         self.assertEqual(_device_state({"arp_status": "probe"}), "online")
         self.assertEqual(_device_state({"arp_status": "stale"}), "idle")
         self.assertEqual(_device_state({"arp_status": "permanent", "bridge_host_present": True}), "online")
-        self.assertEqual(_device_state({"arp_status": "permanent"}), "unknown")
+        self.assertEqual(_device_state({"arp_status": "permanent"}), "idle")
 
     def test_device_state_fallback_for_missing_arp_status(self) -> None:
         self.assertEqual(_device_state({"dhcp_status": "bound"}), "unknown")
@@ -220,7 +220,7 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         )
 
         self.assertEqual(devices[0]["arp_status"], "permanent")
-        self.assertEqual(devices[0]["arp_state"], "unknown")
+        self.assertEqual(devices[0]["arp_state"], "idle")
         self.assertIn("PERM", devices[0]["badges"])
 
     def test_builder_promotes_permanent_to_online_when_bridge_host_present(self) -> None:

@@ -312,6 +312,18 @@ def _sanitize_presence_transition(previous_state: str, current_state: str) -> tu
 
 def _derive_device_state(device: dict[str, Any]) -> str:
     bridge_host_present = bool(device.get("bridge_host_present", False))
+    arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
+    mac = str(device.get("mac_address", "")).strip().upper()
+
+    if arp_status == "permanent":
+        normalized_perm_state = "online" if bridge_host_present else "idle"
+        logger.info(
+            "PERM state normalized to idle/online for MAC %s (resolved=%s)",
+            mac or "unknown",
+            normalized_perm_state,
+        )
+        return normalized_perm_state
+
     if bridge_host_present:
         return "online"
 
@@ -320,7 +332,6 @@ def _derive_device_state(device: dict[str, Any]) -> str:
         return _normalized_device_state(fused_state)
 
     # Backward-compatible fallback for old snapshots without fused_state.
-    arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
     return _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
 
 

@@ -31,6 +31,8 @@ def fused_device_state(raw_status: Any, bridge_host_present: bool) -> str:
 
     if status in _ONLINE_ARP_STATUSES:
         return "online"
+    if status == "permanent":
+        return "online" if bridge_host_present else "idle"
     if bridge_host_present:
         return "online"
     if status in _IDLE_ARP_STATUSES:
