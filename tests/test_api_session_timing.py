@@ -215,6 +215,34 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertEqual(item["offline_since"], "2026-04-08T10:10:00+00:00")
         self.assertIsInstance(item["offline_duration_seconds"], int)
 
+    def test_api_exposes_bridge_host_presence_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:35",
+                            "ip_address": "",
+                            "source": ["bridge_host"],
+                            "arp_status": "unknown",
+                            "arp_state": "online",
+                            "bridge_host_present": True,
+                            "has_arp_entry": False,
+                            "has_dhcp_lease": False,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertTrue(item["flags"]["bridge_host_present"])
+        self.assertFalse(item["flags"]["has_arp_entry"])
+        self.assertFalse(item["flags"]["has_dhcp_lease"])
+
 
 if __name__ == "__main__":
     unittest.main()

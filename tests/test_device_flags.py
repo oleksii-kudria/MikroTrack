@@ -238,6 +238,39 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertIn("bridge_host", devices[0]["source"])
         self.assertIn("PERM", devices[0]["badges"])
 
+    def test_builder_adds_bridge_badge_for_bridge_only_device(self) -> None:
+        devices = build_devices(
+            dhcp=[],
+            arp=[],
+            bridge_hosts=[
+                {"mac_address": "AA", "interface": "bridge1", "bridge_host_last_seen": "5s", "bridge_host_present": True}
+            ],
+        )
+
+        self.assertTrue(devices[0]["bridge_host_present"])
+        self.assertFalse(devices[0]["has_arp_entry"])
+        self.assertFalse(devices[0]["has_dhcp_lease"])
+        self.assertIn("BRIDGE", devices[0]["badges"])
+
+    def test_builder_does_not_add_bridge_badge_when_arp_or_dhcp_exists(self) -> None:
+        with_arp = build_devices(
+            dhcp=[],
+            arp=[{"mac_address": "AA", "ip_address": "192.168.88.10", "status": "reachable", "dynamic": True}],
+            bridge_hosts=[
+                {"mac_address": "AA", "interface": "bridge1", "bridge_host_last_seen": "5s", "bridge_host_present": True}
+            ],
+        )
+        with_dhcp = build_devices(
+            dhcp=[{"mac_address": "BB", "ip_address": "192.168.88.11", "status": "bound", "dynamic": True}],
+            arp=[],
+            bridge_hosts=[
+                {"mac_address": "BB", "interface": "bridge1", "bridge_host_last_seen": "5s", "bridge_host_present": True}
+            ],
+        )
+
+        self.assertNotIn("BRIDGE", with_arp[0]["badges"])
+        self.assertNotIn("BRIDGE", with_dhcp[0]["badges"])
+
     def test_builder_marks_interface_entity_and_name(self) -> None:
         devices = build_devices(
             dhcp=[],
