@@ -1504,6 +1504,57 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIsNone(snapshot["idle_since"])
         self.assertEqual(snapshot["offline_since"], "2026-04-08T10:21:00+00:00")
 
+    def test_save_snapshot_perm_offline_idle_timeout_does_not_restart_offline_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:6C",
+                            "ip_address": "192.168.88.108",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "idle",
+                            "fused_state": "idle",
+                            "bridge_host_present": False,
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": None,
+                            "idle_since": None,
+                            "offline_since": "2026-04-08T10:00:00+00:00",
+                            "last_seen": "2026-04-08T09:20:00+00:00",
+                            "last_seen_by_mac": "2026-04-08T09:20:00+00:00",
+                            "active": False,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T10:30:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:6C",
+                            "ip_address": "192.168.88.108",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "idle",
+                            "fused_state": "idle",
+                            "bridge_host_present": False,
+                            "active": False,
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["arp_state"], "offline")
+        self.assertEqual(snapshot["fused_state"], "offline")
+        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T10:00:00+00:00")
+        self.assertEqual(snapshot["offline_since"], "2026-04-08T10:00:00+00:00")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

@@ -522,6 +522,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             now=now_dt,
             logger_level=logging.INFO,
         )
+        previous_offline_boundary = _parse_snapshot_timestamp(previous.get("offline_since"))
 
         merge_current_state = current_state
         decision = "apply_transition_rules"
@@ -594,7 +595,16 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         elif current_state == "idle" and previous_effective_state == "idle":
             logger.debug("Idle within threshold for MAC %s", mac)
 
-        transition_previous_state = previous_state if idle_timeout_should_force_offline else previous_effective_state
+        if (
+            previous_effective_state == "offline"
+            and merge_current_state == "offline"
+            and previous_offline_boundary is not None
+        ):
+            transition_previous_state = previous_effective_state
+            logger.info("Device remains offline, preserving offline_since for MAC %s", mac)
+            logger.info("Skipping offline transition, state unchanged")
+        else:
+            transition_previous_state = previous_state if idle_timeout_should_force_offline else previous_effective_state
         previous_presence_state, current_presence_state = _sanitize_presence_transition(
             transition_previous_state,
             merge_current_state,
