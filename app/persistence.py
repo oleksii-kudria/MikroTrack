@@ -456,6 +456,13 @@ def _changed_device_fields(previous: dict[str, Any], current: dict[str, Any]) ->
     return changed
 
 
+def _resolve_last_known_value(previous: dict[str, Any], current_key: str, last_known_key: str) -> str:
+    current = str(previous.get(current_key, "")).strip()
+    if current:
+        return current
+    return str(previous.get(last_known_key, "")).strip()
+
+
 def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
     previous_snapshot_path = _latest_snapshot_path()
     previous_devices: list[dict[str, Any]] = []
@@ -482,6 +489,13 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous = previous_by_mac.get(mac)
         current_state = _derive_device_state(current)
         device = dict(current)
+        device["ip_is_stale"] = False
+        device["hostname_is_stale"] = False
+        device["data_is_stale"] = False
+        current_ip = str(device.get("ip_address", "")).strip()
+        current_hostname = str(device.get("host_name", "")).strip()
+        device["last_known_ip"] = current_ip
+        device["last_known_hostname"] = current_hostname
         device.setdefault("state_changed_at", None)
         device.setdefault("online_since", None)
         device.setdefault("idle_since", None)
@@ -511,6 +525,38 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             )
             enriched_devices.append(device)
             continue
+
+        previous_last_known_ip = _resolve_last_known_value(previous, "ip_address", "last_known_ip")
+        previous_last_known_hostname = _resolve_last_known_value(previous, "host_name", "last_known_hostname")
+        if previous_last_known_ip:
+            device["last_known_ip"] = previous_last_known_ip
+        if previous_last_known_hostname:
+            device["last_known_hostname"] = previous_last_known_hostname
+
+        if current_state == "offline":
+            if not current_ip and previous_last_known_ip:
+                logger.info("Preserving last known IP for MAC %s", mac)
+                device["ip_address"] = previous_last_known_ip
+                device["ip_is_stale"] = True
+                device["data_is_stale"] = True
+            elif current_ip:
+                device["last_known_ip"] = current_ip
+
+            if not current_hostname and previous_last_known_hostname:
+                logger.info("Preserving last known hostname for MAC %s", mac)
+                device["host_name"] = previous_last_known_hostname
+                device["hostname_is_stale"] = True
+                device["data_is_stale"] = True
+            elif current_hostname:
+                device["last_known_hostname"] = current_hostname
+
+            if device["data_is_stale"]:
+                logger.info("Marking device data as stale for MAC %s", mac)
+        else:
+            if current_ip:
+                device["last_known_ip"] = current_ip
+            if current_hostname:
+                device["last_known_hostname"] = current_hostname
 
         previous_state = _derive_device_state(previous)
         previous_effective_state = _resolve_previous_effective_state(

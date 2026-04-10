@@ -1557,6 +1557,102 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(snapshot["state_changed_at"], "2026-04-08T10:00:00+00:00")
         self.assertEqual(snapshot["offline_since"], "2026-04-08T10:00:00+00:00")
 
+    def test_save_snapshot_preserves_last_known_ip_and_hostname_for_offline_device(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:7D",
+                            "ip_address": "192.168.88.120",
+                            "host_name": "iphone",
+                            "source": ["dhcp", "arp"],
+                            "arp_status": "failed",
+                            "arp_state": "offline",
+                            "fused_state": "offline",
+                            "offline_since": "2026-04-08T10:00:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:7D",
+                        "ip_address": "",
+                        "host_name": "",
+                        "source": ["arp"],
+                        "arp_status": "failed",
+                        "arp_state": "offline",
+                        "fused_state": "offline",
+                    }
+                ]
+            )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["ip_address"], "192.168.88.120")
+        self.assertEqual(snapshot["host_name"], "iphone")
+        self.assertEqual(snapshot["last_known_ip"], "192.168.88.120")
+        self.assertEqual(snapshot["last_known_hostname"], "iphone")
+        self.assertTrue(snapshot["ip_is_stale"])
+        self.assertTrue(snapshot["hostname_is_stale"])
+        self.assertTrue(snapshot["data_is_stale"])
+
+    def test_save_snapshot_clears_stale_flags_after_reconnect_with_fresh_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:7E",
+                            "ip_address": "192.168.88.121",
+                            "host_name": "iphone-old",
+                            "last_known_ip": "192.168.88.121",
+                            "last_known_hostname": "iphone-old",
+                            "ip_is_stale": True,
+                            "hostname_is_stale": True,
+                            "data_is_stale": True,
+                            "source": ["arp"],
+                            "arp_status": "failed",
+                            "arp_state": "offline",
+                            "fused_state": "offline",
+                            "offline_since": "2026-04-08T10:00:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:7E",
+                        "ip_address": "192.168.88.122",
+                        "host_name": "iphone-new",
+                        "source": ["dhcp", "arp", "bridge_host"],
+                        "bridge_host_present": True,
+                        "arp_status": "reachable",
+                        "arp_state": "online",
+                        "fused_state": "online",
+                    }
+                ]
+            )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertFalse(snapshot["ip_is_stale"])
+        self.assertFalse(snapshot["hostname_is_stale"])
+        self.assertFalse(snapshot["data_is_stale"])
+        self.assertEqual(snapshot["last_known_ip"], "192.168.88.122")
+        self.assertEqual(snapshot["last_known_hostname"], "iphone-new")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

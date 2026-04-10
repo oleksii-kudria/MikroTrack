@@ -373,6 +373,11 @@ def list_devices() -> dict[str, object]:
         arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
         arp_state = str(device.get("arp_state", "")).strip().lower() or device_state
         primary_ip = str(device.get("ip_address", ""))
+        last_known_ip = str(device.get("last_known_ip", "")).strip()
+        last_known_hostname = str(device.get("last_known_hostname", "")).strip()
+        ip_is_stale = bool(device.get("ip_is_stale", False))
+        hostname_is_stale = bool(device.get("hostname_is_stale", False))
+        data_is_stale = bool(device.get("data_is_stale", False))
         arp_secondary = device.get("arp_secondary") if isinstance(device.get("arp_secondary"), list) else []
         badges = [str(value).strip().upper() for value in device.get("badges", []) if str(value).strip()]
         entity_type = str(device.get("entity_type", "client")).strip().lower() or "client"
@@ -442,8 +447,13 @@ def list_devices() -> dict[str, object]:
             {
                 "mac": mac,
                 "ip": primary_ip,
+                "last_known_ip": last_known_ip,
                 "is_link_local_ip": _is_link_local(primary_ip),
                 "hostname": device.get("host_name", ""),
+                "last_known_hostname": last_known_hostname,
+                "ip_is_stale": ip_is_stale,
+                "hostname_is_stale": hostname_is_stale,
+                "data_is_stale": data_is_stale,
                 "dhcp_comment": str(device.get("dhcp_comment", "")),
                 "arp_comment": str(device.get("arp_comment", "")),
                 "comments_badge": _comment_badge_label(
