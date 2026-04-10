@@ -83,22 +83,27 @@ IDLE_TIMEOUT_SECONDS=900
 - `changed`
 - `events`
 
-### Web UI: режим відображення (All vs End devices)
+### Web UI: toolbar, filters, mode, summary
 
-У вкладці Devices є перемикач режиму відображення поруч із контролами сортування/оновлення:
+У вкладці Devices toolbar працює як єдина система:
 
-- `End devices` (за замовчуванням): приховує `BRIDGE`, `COMPLETE`, `INTERFACE` та пристрої зі статусом `unknown`.
-- `All`: показує всі записи без додаткового приховування.
+- Active filters відображаються як **ті самі badge-компоненти**, що й у таблиці (без окремих стилів).
+- Active filters клікабельні (hover/pointer/active) і підтримують очищення як через `Clear ✕`, так і прямим кліком по badge.
+- `Mode` має 2 стани:
+  - `End` (за замовчуванням): приховує `BRIDGE`, `COMPLETE`, `INTERFACE` та пристрої зі статусом `unknown`.
+  - `All`: показує всі записи.
+- `Devices: X | ...` summary рахується **з поточного набору таблиці** після застосування mode + filters.
 
-Порядок обробки в таблиці:
+Порядок обробки:
 
 1. Завантажується повний набір даних
-2. Застосовується фільтр display mode
-3. Застосовуються активні фільтри status/assignment
-4. Застосовується сортування
-5. Відбувається рендер таблиці
+2. Застосовується display mode (`End` / `All`)
+3. Застосовуються активні filters (status/assignment)
+4. Рахується summary для поточного набору
+5. Застосовується сортування
+6. Відбувається рендер таблиці
 
-Статистика `Devices: X | 🟢 ...` рахується від повного набору даних і не змінюється при перемиканні режиму.
+Кольори статусів уніфіковані між status dot, badge та summary.
 
 ### Документація
 
@@ -194,22 +199,27 @@ INFO logs include a summary with:
 - `changed`
 - `events`
 
-### Web UI: display mode (All vs End devices)
+### Web UI: toolbar, filters, mode, summary
 
-Devices tab includes a display mode toggle near sorting/refresh controls:
+In the Devices tab, the toolbar behaves as one coherent system:
 
-- `End devices` (default): hides `BRIDGE`, `COMPLETE`, `INTERFACE`, and devices with `unknown` status.
-- `All`: shows all records without additional hiding.
+- Active filters use the **same badge component** as table badges (no separate filter-only styling).
+- Active filters are clickable (hover/pointer/active) and can be cleared via `Clear ✕` or by clicking a filter badge directly.
+- `Mode` has 2 states:
+  - `End` (default): hides `BRIDGE`, `COMPLETE`, `INTERFACE`, and `unknown` status devices.
+  - `All`: shows all records.
+- `Devices: X | ...` summary is calculated from the **current visible dataset** after applying mode + filters.
 
-Processing order in the table:
+Processing order:
 
 1. Full dataset is loaded
-2. Display mode filter is applied
-3. Active status/assignment filters are applied
-4. Sorting is applied
-5. Rows are rendered
+2. Display mode (`End` / `All`) is applied
+3. Active filters (status/assignment) are applied
+4. Summary is recalculated for the current dataset
+5. Sorting is applied
+6. Rows are rendered
 
-`Devices: X | 🟢 ...` stats are calculated from the full dataset and do not change when switching display mode.
+Status colors are unified across status dots, badges, and summary.
 
 ### Documentation
 

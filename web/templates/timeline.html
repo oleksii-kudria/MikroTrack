@@ -16,6 +16,14 @@
         --accent-soft: #dbeafe;
         --ok: #166534;
         --ok-bg: #dcfce7;
+        --status-online: #16a34a;
+        --status-online-soft: #dcfce7;
+        --status-idle: #ca8a04;
+        --status-idle-soft: #fef9c3;
+        --status-unknown: #7c3aed;
+        --status-unknown-soft: #ede9fe;
+        --status-offline: #dc2626;
+        --status-offline-soft: #fee2e2;
       }
 
       * { box-sizing: border-box; }
@@ -130,6 +138,21 @@
         font-size: 0.88rem;
         color: var(--muted);
         white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .devices-stats-counts {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .devices-stats-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
       }
 
       .active-filters {
@@ -372,18 +395,18 @@
       }
 
       .badge-purple {
-        background: #ede9fe;
-        color: #5b21b6;
+        background: var(--status-unknown-soft);
+        color: var(--status-unknown);
       }
 
       .badge-yellow {
-        background: #fef9c3;
-        color: #a16207;
+        background: var(--status-idle-soft);
+        color: var(--status-idle);
       }
 
       .badge-green {
-        background: #dcfce7;
-        color: #166534;
+        background: var(--status-online-soft);
+        color: var(--status-online);
       }
 
       .badge-gray {
@@ -396,8 +419,8 @@
         color: #c2410c;
       }
       .badge-red {
-        background: #fee2e2;
-        color: #b91c1c;
+        background: var(--status-offline-soft);
+        color: var(--status-offline);
       }
 
       .badge-comment {
@@ -434,19 +457,19 @@
       }
 
       .status-active {
-        background: #16a34a;
+        background: var(--status-online);
       }
 
       .status-inactive {
-        background: #dc2626;
+        background: var(--status-offline);
       }
 
       .status-unknown {
-        background: #6b7280;
+        background: var(--status-unknown);
       }
 
       .status-idle {
-        background: #ca8a04;
+        background: var(--status-idle);
       }
 
       .status-permanent {
@@ -628,13 +651,13 @@
                 <button id="display-mode-end" class="mode-segment active" data-mode="end_devices" type="button" role="tab" aria-selected="true">End</button>
                 <button id="display-mode-all" class="mode-segment" data-mode="all" type="button" role="tab" aria-selected="false">All</button>
               </div>
+              <span id="devices-stats-line" class="devices-stats-line">Devices: 0 | <span class="devices-stats-counts"><span class="devices-stats-item"><span class="status-dot status-active"></span>0</span><span class="devices-stats-item"><span class="status-dot status-idle"></span>0</span><span class="devices-stats-item"><span class="status-dot status-unknown"></span>0</span><span class="devices-stats-item"><span class="status-dot status-inactive"></span>0</span></span></span>
               <label class="auto-refresh-toggle" for="auto-refresh" title="Toggle auto refresh">
                 <span class="auto-refresh-toggle-text">Auto</span>
                 <input id="auto-refresh" type="checkbox" checked aria-label="Auto refresh" />
                 <span class="toggle-switch" aria-hidden="true"></span>
                 <span id="auto-refresh-state" class="toggle-state">ON</span>
               </label>
-              <span id="devices-stats-line" class="devices-stats-line">0 | 🟢0 🟡0 🟣0 🔴0</span>
             </div>
           </div>
         </div>
@@ -877,6 +900,20 @@
         return "";
       };
 
+      const resolveAssignmentBadgeClass = (assignmentRaw) => {
+        const assignment = String(assignmentRaw || "").trim().toUpperCase();
+        const classMap = {
+          INTERFACE: "badge-purple",
+          RANDOM: "badge-orange",
+          PERM: "badge-purple",
+          STATIC: "badge-blue",
+          DYNAMIC: "badge-gray",
+          COMPLETE: "badge-green",
+          BRIDGE: "badge-blue",
+        };
+        return classMap[assignment] || "badge-purple";
+      };
+
       const buildCommentBadges = (item) => {
         const dhcpComment = String(item.dhcp_comment || "").trim();
         const arpComment = String(item.arp_comment || "").trim();
@@ -983,16 +1020,17 @@
         const chips = [];
         if (hasStatus) {
           const statusMap = {
-            online: { icon: "🟢", className: "badge-green", label: "Online" },
-            idle: { icon: "🟡", className: "badge-yellow", label: "Idle" },
-            unknown: { icon: "🟣", className: "badge-purple", label: "Unknown" },
-            offline: { icon: "🔴", className: "badge-red", label: "Offline" },
+            online: { className: "badge-green", label: "ONLINE" },
+            idle: { className: "badge-yellow", label: "IDLE" },
+            unknown: { className: "badge-purple", label: "UNKNOWN" },
+            offline: { className: "badge-red", label: "OFFLINE" },
           };
-          const config = statusMap[statusFilter] || { icon: "•", className: "badge-blue", label: statusFilter };
-          chips.push(`<span class="badge ${config.className}">${config.icon} ${escapeHtml(config.label)}</span>`);
+          const config = statusMap[statusFilter] || { className: "badge-blue", label: String(statusFilter || "").toUpperCase() };
+          chips.push(`<span class="badge ${config.className} filter-chip active" data-filter-type="status" data-filter-value="${escapeHtml(statusFilter)}" role="button" tabindex="0" aria-label="${escapeHtml(`Remove status filter ${config.label}`)}">${escapeHtml(config.label)}</span>`);
         }
         if (hasAssignment) {
-          chips.push(`<span class="badge badge-purple">🎯 ${escapeHtml(assignmentFilter)}</span>`);
+          const assignmentClass = resolveAssignmentBadgeClass(assignmentFilter);
+          chips.push(`<span class="badge ${assignmentClass} filter-chip active" data-filter-type="assignment" data-filter-value="${escapeHtml(assignmentFilter)}" role="button" tabindex="0" aria-label="${escapeHtml(`Remove assignment filter ${assignmentFilter}`)}">${escapeHtml(assignmentFilter)}</span>`);
         }
         activeFiltersChips.innerHTML = chips.join("");
       };
@@ -1010,7 +1048,8 @@
             stats[state] += 1;
           }
         });
-        devicesStatsLine.textContent = `${items.length} | 🟢${stats.online} 🟡${stats.idle} 🟣${stats.unknown} 🔴${stats.offline}`;
+        devicesStatsLine.innerHTML = `Devices: ${items.length} | <span class="devices-stats-counts"><span class="devices-stats-item"><span class="status-dot status-active"></span>${stats.online}</span><span class="devices-stats-item"><span class="status-dot status-idle"></span>${stats.idle}</span><span class="devices-stats-item"><span class="status-dot status-unknown"></span>${stats.unknown}</span><span class="devices-stats-item"><span class="status-dot status-inactive"></span>${stats.offline}</span></span>`;
+        console.info("Summary recalculated for current mode");
       };
 
       const updateDisplayModeUI = () => {
@@ -1445,7 +1484,7 @@
 
         const displayModeItems = applyDisplayMode(deviceItems);
         const filteredItems = applyDeviceFilters(displayModeItems);
-        updateDevicesStats(deviceItems);
+        updateDevicesStats(filteredItems);
 
         if (!filteredItems.length) {
           devicesTable.replaceChildren(createEmptyRow("No devices found"));
@@ -1548,10 +1587,40 @@
         clearDeviceFilters();
         renderDevicesView();
       });
+      activeFiltersChips.addEventListener("click", (event) => {
+        const target = event.target.closest("[data-filter-type]");
+        if (!target) {
+          return;
+        }
+        const filterType = String(target.dataset.filterType || "").trim();
+        if (filterType === "status") {
+          setStatusFilter(null);
+        }
+        if (filterType === "assignment") {
+          setAssignmentFilter(null);
+        }
+        renderDevicesView();
+      });
+      activeFiltersChips.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        const target = event.target.closest("[data-filter-type]");
+        if (!target) {
+          return;
+        }
+        event.preventDefault();
+        target.click();
+      });
       autoRefreshToggle.addEventListener("change", reconfigureAutoRefresh);
       displayModeButtons.forEach((button) => {
         button.addEventListener("click", () => {
           displayMode = button.dataset.mode === "all" ? "all" : "end_devices";
+          if (displayMode === "all") {
+            console.info("Mode switched to ALL");
+          } else {
+            console.info("Mode switched to END");
+          }
           updateDisplayModeUI();
           renderDevicesView();
         });
