@@ -324,6 +324,17 @@ def _has_presence_evidence(device: dict[str, Any]) -> bool:
     return False
 
 
+def _recalculate_state_on_bridge_host_loss(device: dict[str, Any]) -> str:
+    arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
+    if arp_status in {"reachable", "complete"}:
+        return "online"
+    if arp_status in {"stale", "delay", "probe", "permanent"}:
+        return "idle"
+    if arp_status in {"failed", "incomplete", "unknown"}:
+        return "offline"
+    return "unknown"
+
+
 _TRACKED_DEVICE_CHANGE_FIELDS: tuple[str, ...] = (
     "arp_type",
     "arp_flags",
@@ -425,7 +436,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous_state = _derive_device_state(previous)
         merge_current_state = current_state
         decision = "apply_transition_rules"
-        if current_state == "unknown" and _has_presence_evidence(device):
+        previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
+        current_bridge_host_present = bool(device.get("bridge_host_present", False))
+        bridge_host_lost = previous_bridge_host_present and not current_bridge_host_present
+        if bridge_host_lost:
+            merge_current_state = _recalculate_state_on_bridge_host_loss(device)
+            device["arp_state"] = merge_current_state
+            device["fused_state"] = merge_current_state
+            decision = "bridge_host_lost_recalculated_state"
+        elif current_state == "unknown" and _has_presence_evidence(device):
             merge_current_state = previous_state
             decision = "unknown_with_evidence_preserved_previous_state"
         elif (

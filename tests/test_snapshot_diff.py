@@ -588,6 +588,62 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(snapshot["online_since"], "2026-04-08T15:00:00+00:00")
         self.assertIsNone(snapshot["offline_since"])
 
+    def test_save_snapshot_bridge_host_loss_downgrades_online_to_idle_and_emits_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:4A",
+                            "ip_address": "192.168.88.74",
+                            "source": ["dhcp", "arp", "bridge_host"],
+                            "arp_status": "permanent",
+                            "arp_state": "online",
+                            "fused_state": "online",
+                            "bridge_host_present": True,
+                            "state_changed_at": "2026-04-08T15:00:00+00:00",
+                            "online_since": "2026-04-08T15:00:00+00:00",
+                            "idle_since": None,
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            save_snapshot(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:4A",
+                        "ip_address": "192.168.88.74",
+                        "source": ["dhcp", "arp"],
+                        "arp_status": "permanent",
+                        "arp_state": "unknown",
+                        "fused_state": "unknown",
+                        "bridge_host_present": False,
+                    }
+                ]
+            )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+            events = [
+                json.loads(line)
+                for line in (Path(tmp) / "events.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+
+        self.assertEqual(snapshot["fused_state"], "idle")
+        self.assertEqual(snapshot["arp_state"], "idle")
+        self.assertEqual(snapshot["online_since"], "2026-04-08T15:00:00+00:00")
+        self.assertIsNotNone(snapshot["idle_since"])
+        self.assertIsNone(snapshot["offline_since"])
+
+        by_type = {event["event_type"]: event for event in events}
+        self.assertEqual(by_type["state_changed"]["old_state"], "online")
+        self.assertEqual(by_type["state_changed"]["new_state"], "idle")
+        self.assertIn("device_idle", by_type)
+
     def test_save_snapshot_preserves_identity_for_mac_with_different_letter_case(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
