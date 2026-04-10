@@ -536,7 +536,7 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(second_snapshot["offline_since"], first_snapshot["offline_since"])
         self.assertIsNone(second_snapshot["online_since"])
 
-    def test_save_snapshot_unchanged_online_clears_stale_offline_since(self) -> None:
+    def test_save_snapshot_online_restarts_session_when_offline_since_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
             initial_snapshot = [
@@ -567,8 +567,8 @@ class SnapshotDiffTests(unittest.TestCase):
             snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
 
-        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T16:03:00+00:00")
-        self.assertEqual(snapshot["online_since"], "2026-04-08T16:03:00+00:00")
+        self.assertNotEqual(snapshot["state_changed_at"], "2026-04-08T16:03:00+00:00")
+        self.assertEqual(snapshot["online_since"], snapshot["state_changed_at"])
         self.assertIsNone(snapshot["offline_since"])
 
     def test_save_snapshot_adds_null_timestamps_for_unknown_state(self) -> None:
@@ -992,6 +992,56 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIn("treating previous effective state as offline", output)
         self.assertIn("starting new online session", output)
         self.assertIn("Session timer reset", output)
+        self.assertEqual(snapshot["online_since"], snapshot["state_changed_at"])
+        self.assertIsNone(snapshot["idle_since"])
+        self.assertIsNone(snapshot["offline_since"])
+
+    def test_save_snapshot_perm_reconnect_uses_offline_since_as_single_source_of_truth(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "B0:E4:5C:FD:BB:9A",
+                            "ip_address": "192.168.88.101",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "permanent",
+                            "bridge_host_present": False,
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            # stale leaked value from an old online session
+                            "online_since": "2026-04-08T12:00:00+00:00",
+                            "idle_since": "2026-04-08T12:00:00+00:00",
+                            # true session boundary marker from the most recent disconnect
+                            "offline_since": "2026-04-08T10:30:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertLogs("mikrotrack", level="INFO") as logs:
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "B0:E4:5C:FD:BB:9A",
+                            "ip_address": "192.168.88.101",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                        }
+                    ]
+                )
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+
+        output = "\n".join(logs.output)
+        self.assertIn("treating previous effective state as offline", output)
+        self.assertIn("starting new online session", output)
+        self.assertIn("Session timer reset", output)
+        self.assertEqual(snapshot["arp_state"], "online")
         self.assertEqual(snapshot["online_since"], snapshot["state_changed_at"])
         self.assertIsNone(snapshot["idle_since"])
         self.assertIsNone(snapshot["offline_since"])
