@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,10 @@ _DATETIME_TYPE = datetime
 
 
 Event = dict[str, Any]
+
+
+def _now_aware() -> datetime:
+    return datetime.now(UTC)
 
 
 def configure_persistence(path: str, retention_days: int, *, idle_timeout_seconds: int = 900) -> None:
@@ -141,7 +145,7 @@ def _index_devices_by_mac(devices: list[dict[str, Any]]) -> dict[str, dict[str, 
 
 
 def _iso_timestamp() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    return _now_aware().isoformat(timespec="seconds")
 
 
 def _parse_snapshot_timestamp(value: Any) -> datetime | None:
@@ -161,8 +165,8 @@ def _parse_snapshot_timestamp(value: Any) -> datetime | None:
         return None
 
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=datetime.now().astimezone().tzinfo)
-    return parsed
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _idle_timeout_exceeded(*, previous: dict[str, Any], now: datetime) -> bool:
@@ -1025,7 +1029,7 @@ def _make_json_safe(value: Any) -> Any:
 def _generate_diff_events(previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]) -> list[Event]:
     previous_by_mac = _index_devices_by_mac(previous_devices)
     current_by_mac = _index_devices_by_mac(current_devices)
-    now = datetime.now()
+    now = _now_aware()
 
     events: list[Event] = []
     new_count = 0

@@ -74,6 +74,12 @@ IDLE_TIMEOUT_SECONDS=900
 
 Це виправляє кейс, коли `events.jsonl` не створювався для snapshot-ів, що містили лише `mac`.
 
+Уся внутрішня datetime-логіка diff нормалізується до timezone-aware UTC:
+
+- legacy snapshot-и без timezone (наприклад, `2026-04-10T19:41:29`) підтримуються та трактуються як UTC
+- значення із `Z` та `+00:00` також підтримуються
+- нові timestamps (`state_changed_at`, `online_since`, `idle_since`, `offline_since`, event `timestamp`) записуються у єдиному форматі з offset, наприклад `2026-04-10T19:47:01+00:00`
+
 Логи (DEBUG) містять події:
 
 - presence: `NEW_DEVICE`, `DEVICE_REMOVED`
@@ -225,6 +231,12 @@ If both keys are missing, the record is skipped with a warning log:
 - `WARNING persistence: skipping device without MAC key`
 
 This fixes the case where `events.jsonl` was not created for snapshots containing only `mac`.
+
+All internal diff datetimes are normalized to timezone-aware UTC values:
+
+- legacy snapshots without timezone (for example, `2026-04-10T19:41:29`) are still supported and interpreted as UTC
+- `Z` and `+00:00` timestamps are both supported
+- new timestamps (`state_changed_at`, `online_since`, `idle_since`, `offline_since`, event `timestamp`) are persisted in one offset-aware format, for example `2026-04-10T19:47:01+00:00`
 
 DEBUG logs include events:
 

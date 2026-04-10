@@ -4,14 +4,53 @@ import json
 import logging
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from app.persistence import _make_json_safe, configure_persistence, process_snapshot_diff, save_snapshot
+from app.persistence import (
+    _idle_timeout_exceeded,
+    _iso_timestamp,
+    _make_json_safe,
+    _parse_snapshot_timestamp,
+    configure_persistence,
+    process_snapshot_diff,
+    save_snapshot,
+)
 
 
 class SnapshotDiffTests(unittest.TestCase):
+    def test_iso_timestamp_is_timezone_aware_utc(self) -> None:
+        timestamp = _iso_timestamp()
+        self.assertTrue(timestamp.endswith("+00:00"))
+
+    def test_parse_snapshot_timestamp_normalizes_mixed_formats_to_utc_aware(self) -> None:
+        expected = datetime(2026, 4, 10, 10, 0, 0, tzinfo=UTC)
+
+        parsed_from_naive = _parse_snapshot_timestamp("2026-04-10T10:00:00")
+        parsed_from_z = _parse_snapshot_timestamp("2026-04-10T10:00:00Z")
+        parsed_from_offset = _parse_snapshot_timestamp("2026-04-10T12:00:00+02:00")
+
+        self.assertEqual(parsed_from_naive, expected)
+        self.assertEqual(parsed_from_z, expected)
+        self.assertEqual(parsed_from_offset, expected)
+        self.assertEqual(_parse_snapshot_timestamp(""), None)
+        self.assertEqual(_parse_snapshot_timestamp("invalid"), None)
+
+    def test_idle_timeout_exceeded_handles_naive_legacy_snapshot_timestamp(self) -> None:
+        now = datetime(2026, 4, 10, 10, 20, 0, tzinfo=UTC)
+        previous = {"idle_since": "2026-04-10T10:00:00"}
+
+        configure_persistence("/tmp", retention_days=7, idle_timeout_seconds=900)
+        self.assertTrue(_idle_timeout_exceeded(previous=previous, now=now))
+
+    def test_idle_timeout_exceeded_handles_aware_snapshot_timestamp(self) -> None:
+        now = datetime(2026, 4, 10, 10, 20, 0, tzinfo=UTC)
+        previous = {"idle_since": "2026-04-10T10:00:00+00:00"}
+
+        configure_persistence("/tmp", retention_days=7, idle_timeout_seconds=900)
+        self.assertTrue(_idle_timeout_exceeded(previous=previous, now=now))
+
     def test_make_json_safe_normalizes_complex_values(self) -> None:
         class CustomObject:
             def __str__(self) -> str:

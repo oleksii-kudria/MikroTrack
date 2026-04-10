@@ -87,6 +87,12 @@ chmod 755 /data/snapshots
 
 Раніше `events.jsonl` міг не створюватися, якщо snapshot містив тільки `mac` (без `mac_address`), бо diff не міг коректно зіставити пристрої між snapshot-ами.
 
+Внутрішні timestamps у diff нормалізуються до timezone-aware UTC datetime:
+
+- старі snapshot-значення без timezone підтримуються та інтерпретуються як UTC
+- рядки з `Z` і `+00:00` підтримуються однаково
+- нові значення часу в snapshot/events зберігаються у єдиному offset-aware ISO-8601 форматі
+
 Якщо попереднього snapshot немає:
 
 - `[DIFF_SKIPPED] No previous snapshot found`
@@ -106,7 +112,7 @@ chmod 755 /data/snapshots
 
 ```json
 {
-  "timestamp": "2026-04-10T10:15:30",
+  "timestamp": "2026-04-10T10:15:30+00:00",
   "event_type": "FIELD_CHANGE",
   "mac": "AA:BB:CC:DD:EE:FF",
   "device_mac": "AA:BB:CC:DD:EE:FF",
@@ -251,6 +257,12 @@ This keeps diff behavior backward-compatible across snapshot schema variants. If
 
 Previously, `events.jsonl` could be missing when snapshots had only `mac` (without `mac_address`) because diff indexing could not match the same device across snapshots.
 
+Internal diff timestamps are normalized to timezone-aware UTC datetime values:
+
+- legacy snapshot values without timezone are supported and interpreted as UTC
+- `Z` and `+00:00` strings are handled consistently
+- new snapshot/event timestamps are persisted in one offset-aware ISO-8601 format
+
 If no previous snapshot exists:
 
 - `[DIFF_SKIPPED] No previous snapshot found`
@@ -270,7 +282,7 @@ If no previous snapshot exists:
 
 ```json
 {
-  "timestamp": "2026-04-10T10:15:30",
+  "timestamp": "2026-04-10T10:15:30+00:00",
   "event_type": "FIELD_CHANGE",
   "mac": "AA:BB:CC:DD:EE:FF",
   "device_mac": "AA:BB:CC:DD:EE:FF",
