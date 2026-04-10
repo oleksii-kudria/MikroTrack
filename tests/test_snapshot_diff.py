@@ -1726,6 +1726,68 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(snapshot["last_known_ip"], "192.168.88.122")
         self.assertEqual(snapshot["last_known_hostname"], "iphone-new")
 
+    def test_diff_uses_mac_fallback_and_persists_events_jsonl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac": "6E:7B:C9:CC:5A:81",
+                            "source": ["arp"],
+                            "fused_state": "online",
+                            "arp_state": "online",
+                            "arp_status": "reachable",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+            events = process_snapshot_diff(
+                [
+                    {
+                        "mac": "6E:7B:C9:CC:5A:81",
+                        "source": ["arp"],
+                        "fused_state": "offline",
+                        "arp_state": "offline",
+                        "arp_status": "failed",
+                    }
+                ]
+            )
+
+            events_path = Path(tmp) / "events.jsonl"
+            self.assertTrue(events_path.exists())
+            persisted_events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line]
+
+        self.assertEqual(events, persisted_events)
+        self.assertTrue(any(event.get("event_type") == "FIELD_CHANGE" and event.get("field_name") == "state" for event in events))
+
+    def test_diff_prefers_mac_address_when_both_mac_keys_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps([{"mac_address": "AA:AA:AA:AA:AA:01", "mac": "BB:BB:BB:BB:BB:02", "ip_address": "192.168.88.10"}]),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+            events = process_snapshot_diff(
+                [{"mac_address": "AA:AA:AA:AA:AA:01", "mac": "CC:CC:CC:CC:CC:03", "ip_address": "192.168.88.11"}]
+            )
+
+        self.assertTrue(any(event.get("event_type") == "IP_CHANGED" and event.get("mac") == "AA:AA:AA:AA:AA:01" for event in events))
+
+    def test_index_logs_warning_when_device_has_no_mac_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps([{"ip_address": "192.168.88.10"}]),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+            with self.assertLogs("mikrotrack", level="WARNING") as logs:
+                events = process_snapshot_diff([{"ip_address": "192.168.88.11"}])
+
+        self.assertEqual(events, [])
+        self.assertIn("persistence: skipping device without MAC key", "\n".join(logs.output))
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

@@ -63,7 +63,16 @@ IDLE_TIMEOUT_SECONDS=900
 
 ### Event-driven diff
 
-Після кожного нового snapshot (починаючи з другого файлу) застосунок виконує event-driven diff з попереднім snapshot за `mac_address` і фіксує кожну зміну стану пристрою.
+Після кожного нового snapshot (починаючи з другого файлу) застосунок виконує event-driven diff з попереднім snapshot за MAC-ключем з fallback:
+
+- `mac_address` (пріоритет)
+- `mac` (fallback)
+
+Якщо обох ключів немає, запис пропускається з warning логом:
+
+- `WARNING persistence: skipping device without MAC key`
+
+Це виправляє кейс, коли `events.jsonl` не створювався для snapshot-ів, що містили лише `mac`.
 
 Логи (DEBUG) містять події:
 
@@ -198,7 +207,16 @@ IDLE_TIMEOUT_SECONDS=900
 
 ### Event-driven diff
 
-After each new snapshot (starting from the second file), the app computes an event-driven diff against the previous snapshot keyed by `mac_address` and records every device state transition.
+After each new snapshot (starting from the second file), the app computes an event-driven diff against the previous snapshot using MAC key fallback:
+
+- `mac_address` (priority)
+- `mac` (fallback)
+
+If both keys are missing, the record is skipped with a warning log:
+
+- `WARNING persistence: skipping device without MAC key`
+
+This fixes the case where `events.jsonl` was not created for snapshots containing only `mac`.
 
 DEBUG logs include events:
 

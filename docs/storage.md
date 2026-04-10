@@ -76,7 +76,16 @@ chmod 755 /data/snapshots
 
 ## Event-driven diff (аналіз змін)
 
-Під час кожного нового збереження MikroTrack порівнює поточний snapshot із попереднім у `PERSISTENCE_PATH` за ключем `mac_address` і формує події для кожної зміни стану пристрою.
+Під час кожного нового збереження MikroTrack порівнює поточний snapshot із попереднім у `PERSISTENCE_PATH` за MAC-ключем:
+
+- спочатку `mac_address`
+- fallback: `mac`
+
+Це забезпечує сумісність зі старими й новими snapshot-схемами. Якщо в записі немає обох ключів, запис пропускається з warning логом:
+
+- `WARNING persistence: skipping device without MAC key`
+
+Раніше `events.jsonl` міг не створюватися, якщо snapshot містив тільки `mac` (без `mac_address`), бо diff не міг коректно зіставити пристрої між snapshot-ами.
 
 Якщо попереднього snapshot немає:
 
@@ -219,7 +228,16 @@ Typical messages:
 
 ## Event-driven diff (change analysis)
 
-On every new save, MikroTrack compares the current snapshot with the latest previous file in `PERSISTENCE_PATH` keyed by `mac_address` and emits events for every state transition.
+On every new save, MikroTrack compares the current snapshot with the latest previous file in `PERSISTENCE_PATH` using a MAC key with fallback:
+
+- first `mac_address`
+- fallback: `mac`
+
+This keeps diff behavior backward-compatible across snapshot schema variants. If both keys are missing, the record is skipped with a warning log:
+
+- `WARNING persistence: skipping device without MAC key`
+
+Previously, `events.jsonl` could be missing when snapshots had only `mac` (without `mac_address`) because diff indexing could not match the same device across snapshots.
 
 If no previous snapshot exists:
 
