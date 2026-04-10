@@ -454,6 +454,14 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             continue
 
         previous_state = _derive_device_state(previous)
+        previous_effective_state = previous_state
+        if (
+            previous_state == "idle"
+            and isinstance(now_dt, datetime)
+            and _idle_timeout_exceeded(previous=previous, now=now_dt)
+        ):
+            previous_effective_state = "offline"
+
         merge_current_state = current_state
         decision = "apply_transition_rules"
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
@@ -486,19 +494,29 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device["arp_state"] = "online"
             device["fused_state"] = "online"
             decision = "bridge_host_present_forced_online"
+            if previous_effective_state == "offline":
+                device["online_since"] = now_iso
+                device["idle_since"] = None
+                device["offline_since"] = None
+                device["state_changed_at"] = now_iso
+                previous_state = "offline"
         elif current_state == "unknown" and _has_presence_evidence(device):
-            merge_current_state = previous_state
+            merge_current_state = previous_effective_state
             decision = "unknown_with_evidence_preserved_previous_state"
-        elif current_state == "idle" and previous_state == "offline":
+        elif current_state == "idle" and previous_effective_state == "offline":
             merge_current_state = "offline"
             device["arp_state"] = "offline"
             device["fused_state"] = "offline"
             decision = "skip_idle_timeout_already_offline"
             logger.info("Skipping idle timeout, device already offline for MAC %s", mac)
-        elif current_state == "idle" and previous_state == "idle":
+        elif current_state == "idle" and previous_effective_state == "idle":
             logger.debug("Idle within threshold for MAC %s", mac)
 
-        previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, merge_current_state)
+        transition_previous_state = previous_state if idle_timeout_should_force_offline else previous_effective_state
+        previous_presence_state, current_presence_state = _sanitize_presence_transition(
+            transition_previous_state,
+            merge_current_state,
+        )
         previous_state_changed_at = previous.get("state_changed_at")
         previous_online_since = previous.get("online_since")
         previous_idle_since = previous.get("idle_since")
@@ -516,7 +534,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 current_source,
             )
 
-        if previous_state != merge_current_state:
+        if transition_previous_state != merge_current_state:
             device["state_changed_at"] = now_iso
 
             if previous_presence_state == "offline" and current_presence_state in {"online", "idle"}:
