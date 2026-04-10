@@ -124,12 +124,18 @@ def _latest_snapshot_path() -> Path | None:
     return snapshots[-1]
 
 
+def _device_mac(device: dict[str, Any]) -> str:
+    return str(device.get("mac_address") or device.get("mac") or "").strip().upper()
+
+
 def _index_devices_by_mac(devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     indexed: dict[str, dict[str, Any]] = {}
     for device in devices:
-        mac = str(device.get("mac_address", "")).strip().upper()
-        if mac:
-            indexed[mac] = device
+        mac = _device_mac(device)
+        if not mac:
+            logger.warning("persistence: skipping device without MAC key")
+            continue
+        indexed[mac] = device
     return indexed
 
 
@@ -589,7 +595,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
     enriched_devices: list[dict[str, Any]] = []
 
     for current in current_devices:
-        mac = str(current.get("mac_address", "")).strip().upper()
+        mac = _device_mac(current)
         if not mac:
             enriched_devices.append(current)
             continue
