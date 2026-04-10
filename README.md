@@ -83,6 +83,21 @@ IDLE_TIMEOUT_SECONDS=900
 - `changed`
 - `events`
 
+### Last known IP/hostname for offline devices (DHCP expiration)
+
+When a device goes `offline` and DHCP lease later disappears, MikroTrack keeps the latest known identity fields:
+
+- `ip_address`
+- `host_name`
+
+Snapshot enrichment also stores:
+
+- `last_known_ip`
+- `last_known_hostname`
+- stale flags (`ip_is_stale`, `hostname_is_stale`, `data_is_stale`)
+
+In Web UI, stale values are rendered with a muted style and `STALE` badge/tooltip so operators understand this is last known data.
+
 ### Web UI: toolbar, filters, mode, summary
 
 У вкладці Devices toolbar працює як єдина система:
@@ -199,6 +214,21 @@ INFO logs include a summary with:
 - `removed`
 - `changed`
 - `events`
+
+### Last known IP/hostname for offline devices (DHCP expiration)
+
+When a device becomes `offline` and its DHCP lease is later removed, MikroTrack preserves the latest known identity fields:
+
+- `ip_address`
+- `host_name`
+
+Snapshot enrichment also keeps:
+
+- `last_known_ip`
+- `last_known_hostname`
+- stale flags (`ip_is_stale`, `hostname_is_stale`, `data_is_stale`)
+
+In Web UI, stale values are displayed with muted styling and a `STALE` badge/tooltip to make it explicit that these are last known values.
 
 ### Web UI: toolbar, filters, mode, summary
 

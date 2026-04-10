@@ -423,6 +423,10 @@
         color: var(--status-offline);
       }
 
+      .stale-value {
+        color: #6b7280;
+      }
+
       .badge-comment {
         max-width: 380px;
       }
@@ -1118,7 +1122,12 @@
 
       const buildIpCell = (item) => {
         const ipText = String(item.ip || "").trim() || "-";
-        const parts = [`<span>${escapeHtml(ipText)}</span>`];
+        const isStale = Boolean(item.ip_is_stale);
+        const staleTitle = "Last seen IP before DHCP lease expired";
+        const parts = [`<span class="${isStale ? "stale-value" : ""}" title="${isStale ? staleTitle : ""}">${escapeHtml(ipText)}</span>`];
+        if (isStale) {
+          parts.push(badge("STALE", "badge-gray", staleTitle));
+        }
         if (Boolean(item.is_link_local_ip)) {
           parts.push(badge("LINK-LOCAL", "badge-orange", "APIPA / link-local IP address"));
         }
@@ -1133,6 +1142,14 @@
         }
 
         return `<div class="badge-wrap">${parts.join("")}</div>`;
+      };
+
+      const buildHostnameCell = (item) => {
+        const hostnameText = String(item.hostname || "").trim() || "-";
+        if (!Boolean(item.hostname_is_stale)) {
+          return escapeHtml(hostnameText);
+        }
+        return `<span class="stale-value" title="Last seen hostname before DHCP lease expired">${escapeHtml(hostnameText)}</span>`;
       };
 
       const buildSessionCell = (item) => {
@@ -1444,7 +1461,7 @@
       const renderDeviceRowCells = (item) => [
         buildStatusMac(item),
         buildIpCell(item),
-        escapeHtml(item.hostname || "-"),
+        buildHostnameCell(item),
         buildCommentBadges(item),
         buildSemanticAssignmentBadge(item),
         buildStatusCell(item),

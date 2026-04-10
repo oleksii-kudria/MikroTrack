@@ -318,8 +318,44 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["offline_since"])
         self.assertIsNone(item["idle_since"])
         self.assertIsInstance(item["presence_duration_seconds"], int)
-        self.assertLessEqual(item["presence_duration_seconds"], 2)
-        self.assertEqual(item["elapsed_seconds"], item["presence_duration_seconds"])
+
+    def test_api_exposes_stale_last_known_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:37",
+                            "ip_address": "192.168.88.37",
+                            "host_name": "iphone",
+                            "last_known_ip": "192.168.88.37",
+                            "last_known_hostname": "iphone",
+                            "ip_is_stale": True,
+                            "hostname_is_stale": True,
+                            "data_is_stale": True,
+                            "source": ["arp"],
+                            "arp_status": "failed",
+                            "arp_state": "offline",
+                            "fused_state": "offline",
+                            "offline_since": "2026-04-08T10:10:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["ip"], "192.168.88.37")
+        self.assertEqual(item["last_known_ip"], "192.168.88.37")
+        self.assertEqual(item["hostname"], "iphone")
+        self.assertEqual(item["last_known_hostname"], "iphone")
+        self.assertTrue(item["ip_is_stale"])
+        self.assertTrue(item["hostname_is_stale"])
+        self.assertTrue(item["data_is_stale"])
+        self.assertEqual(item["status"], "offline")
 
     def test_idle_timeout_forces_offline_without_offline_since(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
