@@ -10,6 +10,22 @@ from app.api.main import list_devices
 
 
 class ApiSessionTimingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._original_persistence_path = os.environ.get("PERSISTENCE_PATH")
+        self._original_idle_timeout = os.environ.get("IDLE_TIMEOUT_SECONDS")
+        os.environ["IDLE_TIMEOUT_SECONDS"] = "315360000"
+
+    def tearDown(self) -> None:
+        if self._original_persistence_path is None:
+            os.environ.pop("PERSISTENCE_PATH", None)
+        else:
+            os.environ["PERSISTENCE_PATH"] = self._original_persistence_path
+
+        if self._original_idle_timeout is None:
+            os.environ.pop("IDLE_TIMEOUT_SECONDS", None)
+        else:
+            os.environ["IDLE_TIMEOUT_SECONDS"] = self._original_idle_timeout
+
     def test_api_uses_snapshot_raw_timestamps_without_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["PERSISTENCE_PATH"] = tmp
@@ -242,6 +258,70 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertTrue(item["flags"]["bridge_host_present"])
         self.assertFalse(item["flags"]["has_arp_entry"])
         self.assertFalse(item["flags"]["has_dhcp_lease"])
+
+    def test_idle_timeout_forces_offline_without_offline_since(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            os.environ["IDLE_TIMEOUT_SECONDS"] = "60"
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:36",
+                            "ip_address": "192.168.88.36",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                            "bridge_host_present": False,
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": "2026-04-08T10:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            Path(tmp, "events.jsonl").write_text("", encoding="utf-8")
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["status"], "offline")
+        self.assertEqual(item["flags"]["state"], "offline")
+        self.assertFalse(item["active"])
+        self.assertIsNone(item["offline_since"])
+        self.assertIsNone(item["idle_duration_seconds"])
+
+    def test_idle_timeout_not_applied_when_bridge_host_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            os.environ["IDLE_TIMEOUT_SECONDS"] = "60"
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:37",
+                            "ip_address": "192.168.88.37",
+                            "source": ["arp", "bridge_host"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                            "bridge_host_present": True,
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": "2026-04-08T10:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            Path(tmp, "events.jsonl").write_text("", encoding="utf-8")
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["status"], "idle")
+        self.assertEqual(item["flags"]["state"], "idle")
+        self.assertTrue(isinstance(item["idle_duration_seconds"], int))
 
 
 if __name__ == "__main__":

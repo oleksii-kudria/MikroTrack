@@ -27,6 +27,15 @@ def _snapshot_files() -> list[Path]:
     return sorted(path.glob("*.json"), reverse=True)
 
 
+def _idle_timeout_seconds() -> int:
+    raw = os.getenv("IDLE_TIMEOUT_SECONDS", "900")
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return 900
+    return parsed if parsed > 0 else 900
+
+
 def _load_latest_snapshot() -> list[dict[str, Any]] | None:
     files = _snapshot_files()
     if not files:
@@ -209,12 +218,25 @@ def _resolve_api_state(
     offline_since: datetime | None,
     online_since: datetime | None,
     idle_since: datetime | None,
+    bridge_host_present: bool,
+    now: datetime,
+    idle_timeout_seconds: int,
     fallback_state: str,
 ) -> str:
     if isinstance(offline_since, datetime):
         if fallback_state == "idle":
             logger.info("API state mapping: prevented idle override for MAC %s", mac)
         logger.info("API state mapping: resolved offline for MAC %s", mac)
+        return "offline"
+    if (
+        isinstance(idle_since, datetime)
+        and not bridge_host_present
+        and int((now - idle_since).total_seconds()) >= idle_timeout_seconds
+    ):
+        logger.info(
+            "API idle timeout exceeded for MAC %s, resolving state to offline",
+            mac,
+        )
         return "offline"
     if isinstance(idle_since, datetime) and (
         not isinstance(online_since, datetime) or idle_since >= online_since
@@ -281,6 +303,7 @@ def list_devices() -> dict[str, object]:
         return {"items": []}
 
     now = datetime.now(UTC)
+    idle_timeout_seconds = _idle_timeout_seconds()
     events = _read_events()
     session_by_mac: dict[str, dict[str, datetime | None]] = {}
 
@@ -372,6 +395,9 @@ def list_devices() -> dict[str, object]:
             offline_since=offline_since,
             online_since=online_since,
             idle_since=idle_since,
+            bridge_host_present=bridge_host_present,
+            now=now,
+            idle_timeout_seconds=idle_timeout_seconds,
             fallback_state=device_state,
         )
         active = resolved_state == "online"
