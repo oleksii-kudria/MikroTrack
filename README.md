@@ -84,7 +84,15 @@ IDLE_TIMEOUT_SECONDS=900
 - source: `SOURCE_CHANGED`
 - combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
-Кожна подія має timestamp та серіалізується у `events.jsonl` в `PERSISTENCE_PATH` (готовність для web UI).
+Кожна подія перед записом у `events.jsonl` проходить safe serialization у `PERSISTENCE_PATH` (готовність для web UI):
+
+- `datetime` → ISO-8601 string через `isoformat()`
+- `set` / `tuple` → `list`
+- `bytes` → UTF-8 string (або `repr(...)`, якщо декодування неможливе)
+- `dict` / `list` → рекурсивна нормалізація
+- інші нестандартні типи → `str(value)`
+
+Якщо конкретна подія не серіалізується навіть після нормалізації, diff не падає: у логи записуються `event_type`, `mac`, payload та stack trace (`logger.exception`), а інші події продовжують зберігатися.
 
 `FIELD_CHANGE` подія містить: `device_mac`, `field_name`, `previous_value`, `current_value`, `timestamp`.
 
@@ -228,7 +236,15 @@ DEBUG logs include events:
 - source: `SOURCE_CHANGED`
 - combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
-Each event has a timestamp and is persisted to `events.jsonl` under `PERSISTENCE_PATH` (ready for web UI integration).
+Each event is safely normalized before JSONL persistence to `events.jsonl` under `PERSISTENCE_PATH` (ready for web UI integration):
+
+- `datetime` → ISO-8601 string via `isoformat()`
+- `set` / `tuple` → `list`
+- `bytes` → UTF-8 string (or `repr(...)` when decoding fails)
+- `dict` / `list` → recursive normalization
+- other non-standard Python types → `str(value)`
+
+If a specific event still cannot be serialized after normalization, diff does not crash: logs include `event_type`, `mac`, payload preview, and full stack trace (`logger.exception`), while other events continue to persist.
 
 `FIELD_CHANGE` events contain: `device_mac`, `field_name`, `previous_value`, `current_value`, `timestamp`.
 

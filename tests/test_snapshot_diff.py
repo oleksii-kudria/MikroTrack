@@ -8,10 +8,33 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from app.persistence import configure_persistence, process_snapshot_diff, save_snapshot
+from app.persistence import _make_json_safe, configure_persistence, process_snapshot_diff, save_snapshot
 
 
 class SnapshotDiffTests(unittest.TestCase):
+    def test_make_json_safe_normalizes_complex_values(self) -> None:
+        class CustomObject:
+            def __str__(self) -> str:
+                return "custom-value"
+
+        payload = {
+            "dt": datetime(2026, 4, 10, 12, 30, 45),
+            "set_value": {"a", "b"},
+            "tuple_value": ("x", "y"),
+            "bytes_value": b"hello",
+            "nested": [{"raw": b"\xff", "custom": CustomObject()}],
+        }
+
+        safe = _make_json_safe(payload)
+
+        self.assertEqual(safe["dt"], "2026-04-10T12:30:45")
+        self.assertIsInstance(safe["set_value"], list)
+        self.assertCountEqual(safe["set_value"], ["a", "b"])
+        self.assertEqual(safe["tuple_value"], ["x", "y"])
+        self.assertEqual(safe["bytes_value"], "hello")
+        self.assertEqual(safe["nested"][0]["raw"], "b'\\xff'")
+        self.assertEqual(safe["nested"][0]["custom"], "custom-value")
+
     def test_diff_skipped_without_previous_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
@@ -253,6 +276,45 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIn("[DIFF_ERROR] Failed to process snapshots", output)
         self.assertIn("Recommendation: Verify snapshot format and integrity", output)
         self.assertEqual(events, [])
+
+    def test_diff_persists_events_with_non_json_python_types(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:13",
+                            "arp_flags": {"complete": True},
+                            "source": ["arp"],
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+            current = [
+                {
+                    "mac_address": "AA:AA:AA:AA:AA:13",
+                    "arp_flags": {"complete": True, "labels": {"seen", "test"}},
+                    "source": ["arp"],
+                }
+            ]
+
+            events = process_snapshot_diff(current)
+
+            events_path = Path(tmp) / "events.jsonl"
+            persisted_events = [
+                json.loads(line)
+                for line in events_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+
+            self.assertTrue(events)
+            self.assertTrue(events_path.exists())
+            field_change = next(event for event in persisted_events if event.get("field_name") == "arp_flags")
+            labels = field_change["current_value"]["labels"]
+            self.assertIsInstance(labels, list)
+            self.assertCountEqual(labels, ["seen", "test"])
 
     def test_diff_generates_arp_status_and_state_change_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
