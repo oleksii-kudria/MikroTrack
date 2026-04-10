@@ -167,6 +167,79 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIn("SOURCE_CHANGED", event_types)
         self.assertIn("DHCP_REMOVED", event_types)
 
+    def test_extended_diff_field_change_contains_required_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:99",
+                            "ip_address": "192.168.88.10",
+                            "host_name": "old-host",
+                            "source": ["dhcp", "arp"],
+                            "fused_state": "online",
+                            "dhcp_flags": {"dynamic": True},
+                            "arp_flags": {"dynamic": True},
+                            "dhcp_comment": "old-dhcp",
+                            "arp_comment": "old-arp",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7)
+            events = process_snapshot_diff(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:99",
+                        "ip_address": "192.168.88.11",
+                        "host_name": "new-host",
+                        "source": ["arp"],
+                        "fused_state": "offline",
+                        "dhcp_flags": {"dynamic": False},
+                        "arp_flags": {"dynamic": False},
+                        "dhcp_comment": "",
+                        "arp_comment": "new-arp",
+                    }
+                ]
+            )
+
+        field_changes = [event for event in events if event.get("event_type") == "FIELD_CHANGE"]
+        self.assertTrue(field_changes)
+
+        by_field = {str(event["field_name"]): event for event in field_changes}
+        self.assertEqual(by_field["state"]["previous_value"], "online")
+        self.assertEqual(by_field["state"]["current_value"], "offline")
+        self.assertEqual(by_field["ip_address"]["previous_value"], "192.168.88.10")
+        self.assertEqual(by_field["ip_address"]["current_value"], "192.168.88.11")
+        self.assertEqual(by_field["dhcp_presence"]["previous_value"], True)
+        self.assertEqual(by_field["dhcp_presence"]["current_value"], False)
+        self.assertEqual(by_field["source"]["previous_value"], "arp+dhcp")
+        self.assertEqual(by_field["source"]["current_value"], "arp")
+        self.assertEqual(by_field["dhcp_comment"]["previous_value"], "old-dhcp")
+        self.assertIsNone(by_field["dhcp_comment"]["current_value"])
+        self.assertTrue(all(event.get("device_mac") == "AA:AA:AA:AA:AA:99" for event in field_changes))
+
+    def test_extended_diff_no_field_change_events_when_snapshot_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            device = {
+                "mac_address": "AA:AA:AA:AA:AA:98",
+                "ip_address": "192.168.88.10",
+                "host_name": "same-host",
+                "source": ["dhcp", "arp"],
+                "fused_state": "online",
+                "dhcp_flags": {"dynamic": True},
+                "arp_flags": {"dynamic": True},
+                "dhcp_comment": "same",
+                "arp_comment": "same",
+            }
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(json.dumps([device]), encoding="utf-8")
+            configure_persistence(tmp, retention_days=7)
+            events = process_snapshot_diff([dict(device)])
+
+        field_changes = [event for event in events if event.get("event_type") == "FIELD_CHANGE"]
+        self.assertEqual(field_changes, [])
+
     def test_diff_error_for_invalid_snapshot_format(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             snapshot_path = Path(tmp) / "2026-04-05T23-10-00.json"

@@ -217,6 +217,29 @@ def _build_event(
     return event
 
 
+def _build_field_change_event(
+    mac: str,
+    field_name: str,
+    previous_value: Any,
+    current_value: Any,
+    *,
+    device: dict[str, Any] | None = None,
+) -> Event:
+    event: Event = {
+        "timestamp": _iso_timestamp(),
+        "event_type": "FIELD_CHANGE",
+        "mac": mac,
+        "device_mac": mac,
+        "field_name": field_name,
+        "previous_value": previous_value,
+        "current_value": current_value,
+        "old_value": previous_value,
+        "new_value": current_value,
+    }
+    event.update(_event_context(device))
+    return event
+
+
 def _log_event(event: Event) -> None:
     details: list[str] = []
     if "old_value" in event:
@@ -226,6 +249,16 @@ def _log_event(event: Event) -> None:
 
     suffix = f" ({', '.join(details)})" if details else ""
     logger.debug("[%s] Event generated for %s%s", event["event_type"], event["mac"], suffix)
+
+
+def _log_field_change(mac: str, field_name: str, previous_value: Any, current_value: Any) -> None:
+    logger.info(
+        "diff: detected change field=%s mac=%s old=%s new=%s",
+        field_name,
+        mac,
+        previous_value,
+        current_value,
+    )
 
 
 def _build_arp_transition_event(
@@ -461,6 +494,81 @@ def _resolve_last_known_value(previous: dict[str, Any], current_key: str, last_k
     if current:
         return current
     return str(previous.get(last_known_key, "")).strip()
+
+
+def _has_source(source_value: str, source_name: str) -> bool:
+    return source_name in source_value.split("+")
+
+
+def _normalized_optional_text(value: Any) -> str | None:
+    text = str(value).strip()
+    return text or None
+
+
+def _dhcp_lease_type(device: dict[str, Any]) -> str | None:
+    dhcp_flags = device.get("dhcp_flags", {})
+    if not isinstance(dhcp_flags, dict) or "dynamic" not in dhcp_flags:
+        return None
+    return "dynamic" if bool(dhcp_flags.get("dynamic")) else "static"
+
+
+def _extended_field_changes(
+    *,
+    mac: str,
+    previous: dict[str, Any],
+    current: dict[str, Any],
+    previous_effective_state: str,
+    current_state: str,
+) -> list[Event]:
+    previous_source = _source_value(previous)
+    current_source = _source_value(current)
+
+    previous_has_dhcp = _has_source(previous_source, "dhcp")
+    current_has_dhcp = _has_source(current_source, "dhcp")
+
+    previous_values: dict[str, Any] = {
+        "state": previous_effective_state,
+        "ip_address": _normalized_optional_text(previous.get("ip_address")),
+        "hostname": _normalized_optional_text(previous.get("host_name")),
+        "dhcp_lease_type": _dhcp_lease_type(previous),
+        "dhcp_presence": previous_has_dhcp,
+        "dhcp_flags": previous.get("dhcp_flags", {}) if isinstance(previous.get("dhcp_flags", {}), dict) else {},
+        "arp_flags": previous.get("arp_flags", {}) if isinstance(previous.get("arp_flags", {}), dict) else {},
+        "dhcp_comment": _normalized_optional_text(previous.get("dhcp_comment")),
+        "arp_comment": _normalized_optional_text(previous.get("arp_comment")),
+        "source": previous_source or None,
+    }
+    current_values: dict[str, Any] = {
+        "state": current_state,
+        "ip_address": _normalized_optional_text(current.get("ip_address")),
+        "hostname": _normalized_optional_text(current.get("host_name")),
+        "dhcp_lease_type": _dhcp_lease_type(current),
+        "dhcp_presence": current_has_dhcp,
+        "dhcp_flags": current.get("dhcp_flags", {}) if isinstance(current.get("dhcp_flags", {}), dict) else {},
+        "arp_flags": current.get("arp_flags", {}) if isinstance(current.get("arp_flags", {}), dict) else {},
+        "dhcp_comment": _normalized_optional_text(current.get("dhcp_comment")),
+        "arp_comment": _normalized_optional_text(current.get("arp_comment")),
+        "source": current_source or None,
+    }
+
+    events: list[Event] = []
+    for field_name, previous_value in previous_values.items():
+        current_value = current_values[field_name]
+        if previous_value == current_value:
+            continue
+
+        _log_field_change(mac, field_name, previous_value, current_value)
+        event = _build_field_change_event(
+            mac,
+            field_name,
+            previous_value,
+            current_value,
+            device=current,
+        )
+        events.append(event)
+        _log_event(event)
+
+    return events
 
 
 def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -919,6 +1027,23 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                 _log_event(interface_event)
             continue
 
+        previous_effective_state = _resolve_previous_effective_state(
+            previous=previous,
+            mac=mac,
+            now=now,
+            logger_level=logging.DEBUG,
+        )
+        current_fused_state = _derive_device_state(current)
+        extended_events = _extended_field_changes(
+            mac=mac,
+            previous=previous,
+            current=current,
+            previous_effective_state=previous_effective_state,
+            current_state=current_fused_state,
+        )
+        if extended_events:
+            events.extend(extended_events)
+
         previous_ip = str(previous.get("ip_address", ""))
         current_ip = str(current.get("ip_address", ""))
         if previous_ip != current_ip:
@@ -1093,13 +1218,6 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
 
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(current.get("bridge_host_present", False))
-        previous_effective_state = _resolve_previous_effective_state(
-            previous=previous,
-            mac=mac,
-            now=now,
-            logger_level=logging.DEBUG,
-        )
-        current_fused_state = _derive_device_state(current)
         if previous_effective_state != current_fused_state:
             changed_count += 1
             logger.debug("[arp_state_changed] Fused state changed: %s -> %s", previous_effective_state, current_fused_state)

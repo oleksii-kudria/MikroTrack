@@ -68,6 +68,7 @@ IDLE_TIMEOUT_SECONDS=900
 Логи (DEBUG) містять події:
 
 - presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- extended diff: `FIELD_CHANGE` (`state`, `ip_address`, `hostname`, `dhcp_lease_type`, `dhcp_presence`, `dhcp_flags`, `arp_flags`, `dhcp_comment`, `arp_comment`, `source`)
 - identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
 - DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
 - ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
@@ -75,6 +76,8 @@ IDLE_TIMEOUT_SECONDS=900
 - combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
 Кожна подія має timestamp та серіалізується у `events.jsonl` в `PERSISTENCE_PATH` (готовність для web UI).
+
+`FIELD_CHANGE` подія містить: `device_mac`, `field_name`, `previous_value`, `current_value`, `timestamp`.
 
 У логах INFO є summary:
 
@@ -200,6 +203,7 @@ After each new snapshot (starting from the second file), the app computes an eve
 DEBUG logs include events:
 
 - presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- extended diff: `FIELD_CHANGE` (`state`, `ip_address`, `hostname`, `dhcp_lease_type`, `dhcp_presence`, `dhcp_flags`, `arp_flags`, `dhcp_comment`, `arp_comment`, `source`)
 - identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
 - DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
 - ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
@@ -207,6 +211,8 @@ DEBUG logs include events:
 - combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
 
 Each event has a timestamp and is persisted to `events.jsonl` under `PERSISTENCE_PATH` (ready for web UI integration).
+
+`FIELD_CHANGE` events contain: `device_mac`, `field_name`, `previous_value`, `current_value`, `timestamp`.
 
 INFO logs include a summary with:
 
