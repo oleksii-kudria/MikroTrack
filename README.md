@@ -87,19 +87,20 @@ IDLE_TIMEOUT_SECONDS=900
 
 У вкладці Devices toolbar працює як єдина система:
 
+- Layout побудовано у логічному потоці: `Filters → Mode → Summary → Actions`.
 - Active filters відображаються як **ті самі badge-компоненти**, що й у таблиці (без окремих стилів).
 - Active filters клікабельні (hover/pointer/active) і підтримують очищення як через `Clear ✕`, так і прямим кліком по badge.
 - `Mode` має 2 стани:
   - `End` (за замовчуванням): приховує `BRIDGE`, `COMPLETE`, `INTERFACE` та пристрої зі статусом `unknown`.
   - `All`: показує всі записи.
-- `Devices: X | ...` summary рахується **з поточного набору таблиці** після застосування mode + filters.
+- `Devices: X | ...` summary рахується **тільки з dataset поточного mode** (End/All), але **не залежить від filters**.
 
 Порядок обробки:
 
 1. Завантажується повний набір даних
 2. Застосовується display mode (`End` / `All`)
-3. Застосовуються активні filters (status/assignment)
-4. Рахується summary для поточного набору
+3. Рахується summary для dataset поточного mode
+4. Застосовуються активні filters (status/assignment) для таблиці
 5. Застосовується сортування
 6. Відбувається рендер таблиці
 
@@ -203,19 +204,20 @@ INFO logs include a summary with:
 
 In the Devices tab, the toolbar behaves as one coherent system:
 
+- The layout follows a logical flow: `Filters → Mode → Summary → Actions`.
 - Active filters use the **same badge component** as table badges (no separate filter-only styling).
 - Active filters are clickable (hover/pointer/active) and can be cleared via `Clear ✕` or by clicking a filter badge directly.
 - `Mode` has 2 states:
   - `End` (default): hides `BRIDGE`, `COMPLETE`, `INTERFACE`, and `unknown` status devices.
   - `All`: shows all records.
-- `Devices: X | ...` summary is calculated from the **current visible dataset** after applying mode + filters.
+- `Devices: X | ...` summary is calculated **only from the current mode dataset** (End/All) and **does not depend on filters**.
 
 Processing order:
 
 1. Full dataset is loaded
 2. Display mode (`End` / `All`) is applied
-3. Active filters (status/assignment) are applied
-4. Summary is recalculated for the current dataset
+3. Summary is recalculated for the current mode dataset
+4. Active filters (status/assignment) are applied to table rows
 5. Sorting is applied
 6. Rows are rendered
 

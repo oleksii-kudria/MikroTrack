@@ -636,14 +636,9 @@
           <div class="devices-controls">
             <div class="toolbar-group">
               <div id="active-filters" class="active-filters hidden" aria-live="polite">
-              <span id="active-filters-chips" class="active-filters-chips"></span>
+                <span id="active-filters-chips" class="active-filters-chips"></span>
                 <button id="clear-device-filters" class="clear-filters-btn" type="button">Clear ✕</button>
               </div>
-            </div>
-            <span class="toolbar-divider" aria-hidden="true">|</span>
-            <div class="toolbar-group refresh-controls">
-              <button id="devices-clear-sort" class="icon-btn" type="button" title="Sort" aria-label="Sort">⇅</button>
-              <button id="devices-refresh" class="icon-btn" type="button" title="Refresh" aria-label="Refresh">↻</button>
             </div>
             <span class="toolbar-divider" aria-hidden="true">|</span>
             <div class="toolbar-group">
@@ -651,7 +646,15 @@
                 <button id="display-mode-end" class="mode-segment active" data-mode="end_devices" type="button" role="tab" aria-selected="true">End</button>
                 <button id="display-mode-all" class="mode-segment" data-mode="all" type="button" role="tab" aria-selected="false">All</button>
               </div>
+            </div>
+            <span class="toolbar-divider" aria-hidden="true">|</span>
+            <div class="toolbar-group">
               <span id="devices-stats-line" class="devices-stats-line">Devices: 0 | <span class="devices-stats-counts"><span class="devices-stats-item"><span class="status-dot status-active"></span>0</span><span class="devices-stats-item"><span class="status-dot status-idle"></span>0</span><span class="devices-stats-item"><span class="status-dot status-unknown"></span>0</span><span class="devices-stats-item"><span class="status-dot status-inactive"></span>0</span></span></span>
+            </div>
+            <span class="toolbar-divider" aria-hidden="true">|</span>
+            <div class="toolbar-group refresh-controls">
+              <button id="devices-clear-sort" class="icon-btn" type="button" title="Sort" aria-label="Sort">⇅</button>
+              <button id="devices-refresh" class="icon-btn" type="button" title="Refresh" aria-label="Refresh">↻</button>
               <label class="auto-refresh-toggle" for="auto-refresh" title="Toggle auto refresh">
                 <span class="auto-refresh-toggle-text">Auto</span>
                 <input id="auto-refresh" type="checkbox" checked aria-label="Auto refresh" />
@@ -1484,7 +1487,7 @@
 
         const displayModeItems = applyDisplayMode(deviceItems);
         const filteredItems = applyDeviceFilters(displayModeItems);
-        updateDevicesStats(filteredItems);
+        updateDevicesStats(displayModeItems);
 
         if (!filteredItems.length) {
           devicesTable.replaceChildren(createEmptyRow("No devices found"));
