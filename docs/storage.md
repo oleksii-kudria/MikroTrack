@@ -85,6 +85,7 @@ chmod 755 /data/snapshots
 ### Типи подій (DEBUG)
 
 - Presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- Extended diff: `FIELD_CHANGE` (state, ip_address, hostname, dhcp_lease_type, dhcp_presence, dhcp_flags, arp_flags, dhcp_comment, arp_comment, source)
 - IP/identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
 - DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
 - ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`, `arp_status_changed`, `arp_state_changed`
@@ -96,13 +97,21 @@ chmod 755 /data/snapshots
 
 ```json
 {
-  "timestamp": "2026-04-06T21:17:55",
-  "event_type": "DHCP_DYNAMIC_CHANGED",
+  "timestamp": "2026-04-10T10:15:30",
+  "event_type": "FIELD_CHANGE",
   "mac": "AA:BB:CC:DD:EE:FF",
-  "old_value": true,
-  "new_value": false
+  "device_mac": "AA:BB:CC:DD:EE:FF",
+  "field_name": "ip_address",
+  "previous_value": "192.168.1.10",
+  "current_value": "192.168.1.25",
+  "old_value": "192.168.1.10",
+  "new_value": "192.168.1.25"
 }
 ```
+
+INFO log example:
+
+- `INFO diff: detected change field=ip_address mac=AA:BB:CC:DD:EE:FF old=192.168.1.10 new=192.168.1.25`
 
 ### Збереження подій
 
@@ -219,6 +228,7 @@ If no previous snapshot exists:
 ### Event types (DEBUG)
 
 - Presence: `NEW_DEVICE`, `DEVICE_REMOVED`
+- Extended diff: `FIELD_CHANGE` (state, ip_address, hostname, dhcp_lease_type, dhcp_presence, dhcp_flags, arp_flags, dhcp_comment, arp_comment, source)
 - IP/identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
 - DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
 - ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`, `arp_status_changed`, `arp_state_changed`
@@ -230,13 +240,21 @@ If no previous snapshot exists:
 
 ```json
 {
-  "timestamp": "2026-04-06T21:17:55",
-  "event_type": "DHCP_DYNAMIC_CHANGED",
+  "timestamp": "2026-04-10T10:15:30",
+  "event_type": "FIELD_CHANGE",
   "mac": "AA:BB:CC:DD:EE:FF",
-  "old_value": true,
-  "new_value": false
+  "device_mac": "AA:BB:CC:DD:EE:FF",
+  "field_name": "ip_address",
+  "previous_value": "192.168.1.10",
+  "current_value": "192.168.1.25",
+  "old_value": "192.168.1.10",
+  "new_value": "192.168.1.25"
 }
 ```
+
+INFO log example:
+
+- `INFO diff: detected change field=ip_address mac=AA:BB:CC:DD:EE:FF old=192.168.1.10 new=192.168.1.25`
 
 ### Event persistence
 
