@@ -4,6 +4,7 @@ import json
 import logging
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -282,6 +283,52 @@ class SnapshotDiffTests(unittest.TestCase):
 
         self.assertEqual(ended_by_type["state_changed"]["old_state"], "online")
         self.assertEqual(ended_by_type["state_changed"]["new_state"], "offline")
+
+    def test_diff_treats_idle_timeout_as_offline_before_reconnect(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:22",
+                            "ip_address": "192.168.88.82",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "fused_state": "idle",
+                            "state_changed_at": "2026-04-08T10:30:00+00:00",
+                            "idle_since": "2026-04-08T10:30:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+
+            with patch("app.persistence.datetime") as mock_datetime:
+                mock_datetime.now.return_value = datetime.fromisoformat("2026-04-08T10:50:00+00:00")
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+
+                events = process_snapshot_diff(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:22",
+                            "ip_address": "192.168.88.82",
+                            "source": ["arp", "bridge_host"],
+                            "arp_status": "stale",
+                            "fused_state": "online",
+                            "bridge_host_present": True,
+                        }
+                    ]
+                )
+
+        by_type = {event["event_type"]: event for event in events}
+        self.assertEqual(by_type["arp_state_changed"]["old_state"], "offline")
+        self.assertEqual(by_type["arp_state_changed"]["new_state"], "online")
+        self.assertEqual(by_type["state_changed"]["old_state"], "offline")
+        self.assertEqual(by_type["state_changed"]["new_state"], "online")
+        self.assertEqual(by_type["session_started"]["event_type"], "session_started")
 
     def test_diff_uses_fused_state_for_state_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

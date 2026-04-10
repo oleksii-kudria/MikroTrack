@@ -739,6 +739,7 @@ def _append_events(events: list[Event]) -> None:
 def _generate_diff_events(previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]) -> list[Event]:
     previous_by_mac = _index_devices_by_mac(previous_devices)
     current_by_mac = _index_devices_by_mac(current_devices)
+    now = datetime.now()
 
     events: list[Event] = []
     new_count = 0
@@ -952,18 +953,21 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
 
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(current.get("bridge_host_present", False))
-        previous_fused_state = _derive_device_state(previous)
+        previous_state = _derive_device_state(previous)
+        previous_effective_state = previous_state
+        if previous_state == "idle" and _idle_timeout_exceeded(previous=previous, now=now):
+            previous_effective_state = "offline"
         current_fused_state = _derive_device_state(current)
-        if previous_fused_state != current_fused_state:
+        if previous_effective_state != current_fused_state:
             changed_count += 1
-            logger.debug("[arp_state_changed] Fused state changed: %s -> %s", previous_fused_state, current_fused_state)
+            logger.debug("[arp_state_changed] Fused state changed: %s -> %s", previous_effective_state, current_fused_state)
             event = _build_arp_transition_event(
                 "arp_state_changed",
                 mac,
                 device=current,
                 old_key="old_state",
                 new_key="new_state",
-                old_value=previous_fused_state,
+                old_value=previous_effective_state,
                 new_value=current_fused_state,
             )
             events.append(event)
@@ -971,7 +975,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
 
             if current_fused_state in {"online", "offline", "idle"}:
                 reason = _device_offline_reason(
-                    previous_fused_state,
+                    previous_effective_state,
                     current_fused_state,
                     current_arp_status,
                     current_bridge_host_present,
@@ -984,7 +988,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                     "type": f"device_{current_fused_state}",
                     "mac": mac,
                     "reason": reason,
-                    "old_value": previous_fused_state,
+                    "old_value": previous_effective_state,
                     "new_value": current_fused_state,
                 }
                 device_event.update(_event_context(current))
@@ -992,7 +996,7 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                 _log_event(device_event)
 
             previous_presence_state, current_presence_state = _sanitize_presence_transition(
-                previous_fused_state,
+                previous_effective_state,
                 current_fused_state,
             )
             if previous_presence_state != "unknown" and current_presence_state != "unknown":
