@@ -147,6 +147,23 @@ In Web UI, stale values are rendered with a muted style and `STALE` badge/toolti
 
 Кольори статусів уніфіковані між status dot, badge та summary.
 
+### Web UI: сортування таблиці Devices
+
+- Підтримується тільки **single-column sorting**.
+- Стан сортування для кожного заголовка: `none → asc → desc`.
+- Якщо користувач обрав стовпчик, застосовується лише це explicit sorting (без multi-column chaining).
+- Якщо explicit sorting не обрано, використовується default порядок:
+  1. `online`
+  2. `idle`
+  3. `offline`
+  4. `unknown`
+- Усередині статусних груп:
+  - `online` → `online_since`
+  - `idle` → `idle_since`
+  - `offline` → `offline_since`
+  - `unknown` → тільки алфавітне сортування (без date fallback)
+- Для `unknown` і для порожніх значень діє стабільна deterministic поведінка без прихованих режимів.
+
 ### Документація
 
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
@@ -304,6 +321,23 @@ Processing order:
 6. Rows are rendered
 
 Status colors are unified across status dots, badges, and summary.
+
+### Web UI: Devices table sorting
+
+- Only **single-column sorting** is supported.
+- Header click state is `none → asc → desc`.
+- When a user picks a column, only that explicit sort is applied (no multi-column chaining).
+- When no explicit sort is selected, default ordering is used:
+  1. `online`
+  2. `idle`
+  3. `offline`
+  4. `unknown`
+- Within status groups:
+  - `online` → `online_since`
+  - `idle` → `idle_since`
+  - `offline` → `offline_since`
+  - `unknown` → alphabetical only (no date fallback)
+- `unknown` and empty values use stable deterministic behavior with no hidden sort modes.
 
 ### Documentation
 
