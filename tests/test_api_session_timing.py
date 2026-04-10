@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.api.main import list_devices
@@ -258,6 +259,67 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertTrue(item["flags"]["bridge_host_present"])
         self.assertFalse(item["flags"]["has_arp_entry"])
         self.assertFalse(item["flags"]["has_dhcp_lease"])
+
+    def test_api_uses_new_online_session_after_offline_reconnect(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            reconnect_ts = datetime.now(UTC).replace(microsecond=0)
+            reconnect_iso = reconnect_ts.isoformat()
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:36",
+                            "ip_address": "192.168.88.36",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "state_changed_at": reconnect_iso,
+                            "online_since": reconnect_iso,
+                            "idle_since": None,
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            Path(tmp, "events.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "timestamp": "2026-04-08T10:00:00+00:00",
+                                "event_type": "state_changed",
+                                "mac": "AA:AA:AA:AA:AA:36",
+                                "old_state": "online",
+                                "new_state": "offline",
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "timestamp": reconnect_iso,
+                                "event_type": "state_changed",
+                                "mac": "AA:AA:AA:AA:AA:36",
+                                "old_state": "offline",
+                                "new_state": "online",
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["status"], "online")
+        self.assertEqual(item["online_since"], reconnect_iso)
+        self.assertIsNone(item["offline_since"])
+        self.assertIsNone(item["idle_since"])
+        self.assertIsInstance(item["presence_duration_seconds"], int)
+        self.assertLessEqual(item["presence_duration_seconds"], 2)
+        self.assertEqual(item["elapsed_seconds"], item["presence_duration_seconds"])
 
     def test_idle_timeout_forces_offline_without_offline_since(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

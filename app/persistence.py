@@ -324,6 +324,34 @@ def _derive_device_state(device: dict[str, Any]) -> str:
     return _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
 
 
+def _resolve_previous_effective_state(
+    *,
+    previous: dict[str, Any],
+    mac: str,
+    now: datetime | None = None,
+    logger_level: int = logging.DEBUG,
+) -> str:
+    previous_state = _derive_device_state(previous)
+    previous_offline_since = _parse_snapshot_timestamp(previous.get("offline_since"))
+    previous_online_since = _parse_snapshot_timestamp(previous.get("online_since"))
+
+    has_valid_offline_boundary = previous_offline_since is not None and (
+        previous_online_since is None or previous_offline_since >= previous_online_since
+    )
+    if has_valid_offline_boundary:
+        logger.log(
+            logger_level,
+            "Previous snapshot contains offline_since for MAC %s, treating previous effective state as offline",
+            mac,
+        )
+        return "offline"
+
+    if previous_state == "idle" and now is not None and _idle_timeout_exceeded(previous=previous, now=now):
+        return "offline"
+
+    return previous_state
+
+
 def _has_presence_evidence(device: dict[str, Any]) -> bool:
     bridge_host_present = bool(device.get("bridge_host_present", False))
     evidence = device.get("evidence")
@@ -454,13 +482,12 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             continue
 
         previous_state = _derive_device_state(previous)
-        previous_effective_state = previous_state
-        if (
-            previous_state == "idle"
-            and isinstance(now_dt, datetime)
-            and _idle_timeout_exceeded(previous=previous, now=now_dt)
-        ):
-            previous_effective_state = "offline"
+        previous_effective_state = _resolve_previous_effective_state(
+            previous=previous,
+            mac=mac,
+            now=now_dt,
+            logger_level=logging.INFO,
+        )
 
         merge_current_state = current_state
         decision = "apply_transition_rules"
@@ -500,6 +527,11 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 device["offline_since"] = None
                 device["state_changed_at"] = now_iso
                 previous_state = "offline"
+                logger.info(
+                    "Reconnect detected for MAC %s, starting new online session",
+                    mac,
+                )
+                logger.info("Session timer reset for MAC %s", mac)
         elif current_state == "unknown" and _has_presence_evidence(device):
             merge_current_state = previous_effective_state
             decision = "unknown_with_evidence_preserved_previous_state"
@@ -542,6 +574,11 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 device["idle_since"] = now_iso if current_presence_state == "idle" else None
                 device["offline_since"] = None
                 decision = "transition_offline_to_online"
+                logger.info(
+                    "Reconnect detected for MAC %s, starting new online session",
+                    mac,
+                )
+                logger.info("Session timer reset for MAC %s", mac)
             elif previous_presence_state in {"online", "idle"} and current_presence_state == "offline":
                 device["online_since"] = None
                 device["idle_since"] = None
@@ -953,10 +990,12 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
 
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(current.get("bridge_host_present", False))
-        previous_state = _derive_device_state(previous)
-        previous_effective_state = previous_state
-        if previous_state == "idle" and _idle_timeout_exceeded(previous=previous, now=now):
-            previous_effective_state = "offline"
+        previous_effective_state = _resolve_previous_effective_state(
+            previous=previous,
+            mac=mac,
+            now=now,
+            logger_level=logging.DEBUG,
+        )
         current_fused_state = _derive_device_state(current)
         if previous_effective_state != current_fused_state:
             changed_count += 1
