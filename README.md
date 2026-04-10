@@ -83,6 +83,23 @@ IDLE_TIMEOUT_SECONDS=900
 - `changed`
 - `events`
 
+### Web UI: режим відображення (All vs End devices)
+
+У вкладці Devices є перемикач режиму відображення поруч із контролами сортування/оновлення:
+
+- `End devices` (за замовчуванням): приховує `BRIDGE`, `COMPLETE`, `INTERFACE` та пристрої зі статусом `unknown`.
+- `All`: показує всі записи без додаткового приховування.
+
+Порядок обробки в таблиці:
+
+1. Завантажується повний набір даних
+2. Застосовується фільтр display mode
+3. Застосовуються активні фільтри status/assignment
+4. Застосовується сортування
+5. Відбувається рендер таблиці
+
+Статистика `Devices: X | 🟢 ...` рахується від повного набору даних і не змінюється при перемиканні режиму.
+
 ### Документація
 
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
@@ -176,6 +193,23 @@ INFO logs include a summary with:
 - `removed`
 - `changed`
 - `events`
+
+### Web UI: display mode (All vs End devices)
+
+Devices tab includes a display mode toggle near sorting/refresh controls:
+
+- `End devices` (default): hides `BRIDGE`, `COMPLETE`, `INTERFACE`, and devices with `unknown` status.
+- `All`: shows all records without additional hiding.
+
+Processing order in the table:
+
+1. Full dataset is loaded
+2. Display mode filter is applied
+3. Active status/assignment filters are applied
+4. Sorting is applied
+5. Rows are rendered
+
+`Devices: X | 🟢 ...` stats are calculated from the full dataset and do not change when switching display mode.
 
 ### Documentation
 
