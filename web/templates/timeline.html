@@ -157,6 +157,19 @@
         flex-wrap: nowrap;
       }
 
+      .display-mode-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        padding: 4px 8px;
+      }
+
+      .display-mode-control select {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+      }
+
       .icon-btn {
         width: 34px;
         height: 34px;
@@ -548,6 +561,13 @@
             <div class="refresh-controls">
               <button id="devices-clear-sort" class="icon-btn" type="button" title="Clear sorting" aria-label="Clear sorting">⇅</button>
               <button id="devices-refresh" class="icon-btn" type="button" title="Refresh now" aria-label="Refresh now">↻</button>
+              <label class="stat display-mode-control" for="display-mode" title="Show only end devices (hide BRIDGE, COMPLETE, INTERFACE, unknown)">
+                <span>Mode</span>
+                <select id="display-mode" aria-label="Devices display mode">
+                  <option value="end_devices" selected>End devices</option>
+                  <option value="all">All</option>
+                </select>
+              </label>
               <label class="stat auto-refresh-toggle" for="auto-refresh" title="Toggle auto refresh">
                 <span class="auto-refresh-toggle-text">Auto</span>
                 <input id="auto-refresh" type="checkbox" checked aria-label="Auto refresh" />
@@ -664,6 +684,7 @@
       const devicesTable = document.getElementById("devices-table");
       const deviceSortableHeaders = Array.from(document.querySelectorAll("#devices-panel th.sortable"));
       const autoRefreshToggle = document.getElementById("auto-refresh");
+      const displayModeSelect = document.getElementById("display-mode");
       const devicesRefreshButton = document.getElementById("devices-refresh");
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
       const clearDeviceFiltersButton = document.getElementById("clear-device-filters");
@@ -676,6 +697,7 @@
       let activeDeviceSort = null;
       let statusFilter = null;
       let assignmentFilter = null;
+      let displayMode = "end_devices";
 
       const fmtClock = (value) => {
         const raw = String(value || "").trim();
@@ -932,6 +954,30 @@
             return false;
           }
 
+          return true;
+        });
+      };
+
+      const applyDisplayMode = (items) => {
+        if (displayMode === "all") {
+          return items;
+        }
+
+        return items.filter((item) => {
+          const status = normalizeStatus(item);
+          const assignment = resolveAssignment(item);
+          if (status === "unknown") {
+            return false;
+          }
+          if (assignment === "BRIDGE") {
+            return false;
+          }
+          if (assignment === "COMPLETE") {
+            return false;
+          }
+          if (assignment === "INTERFACE") {
+            return false;
+          }
           return true;
         });
       };
@@ -1318,8 +1364,9 @@
           updateDeviceRow(cached.row, cached.item);
         });
 
-        const filteredItems = applyDeviceFilters(deviceItems);
-        updateDevicesStats(filteredItems);
+        const displayModeItems = applyDisplayMode(deviceItems);
+        const filteredItems = applyDeviceFilters(displayModeItems);
+        updateDevicesStats(deviceItems);
 
         if (!filteredItems.length) {
           devicesTable.replaceChildren(createEmptyRow("No devices found"));
@@ -1422,6 +1469,10 @@
         renderDevicesView();
       });
       autoRefreshToggle.addEventListener("change", reconfigureAutoRefresh);
+      displayModeSelect.addEventListener("change", () => {
+        displayMode = displayModeSelect.value === "all" ? "all" : "end_devices";
+        renderDevicesView();
+      });
       devicesTable.addEventListener("click", (event) => {
         const target = event.target.closest("[data-filter-type]");
         if (!target) {
