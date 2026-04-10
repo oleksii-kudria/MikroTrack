@@ -120,7 +120,6 @@
         width: 100%;
         flex-wrap: nowrap;
         padding: 2px 0;
-        overflow-x: auto;
       }
 
       .toolbar-group {
@@ -128,7 +127,6 @@
         align-items: center;
         gap: 8px;
         min-width: 0;
-        flex-wrap: nowrap;
       }
 
       .toolbar-divider {
@@ -165,22 +163,11 @@
         min-width: 0;
       }
 
-      .filters-title {
-        font-size: 0.72rem;
-        letter-spacing: 0.03em;
-        font-weight: 700;
-      }
-
       .active-filters-chips {
         display: inline-flex;
         gap: 6px;
         align-items: center;
         flex-wrap: nowrap;
-      }
-
-      .active-filters-empty {
-        font-size: 0.8rem;
-        color: var(--muted);
       }
 
       .refresh-controls {
@@ -450,35 +437,6 @@
         gap: 8px;
       }
 
-      .device-main {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .device-name-line {
-        font-weight: 600;
-      }
-
-      .device-mac-line {
-        color: var(--muted);
-        font-size: 0.83rem;
-      }
-
-      .device-badges-line {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        flex-wrap: wrap;
-      }
-
-      .device-status-line {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        white-space: nowrap;
-      }
-
       .status-value {
         cursor: pointer;
         border-radius: 999px;
@@ -527,10 +485,6 @@
         font-weight: 600;
       }
 
-      .session-timer-online {
-        color: var(--status-online);
-      }
-
       .session-timer-idle {
         color: #4b5563;
       }
@@ -576,8 +530,17 @@
           grid-template-columns: 1fr;
         }
 
+        .devices-controls {
+          flex-wrap: wrap;
+        }
+
         .toolbar-divider {
           display: none;
+        }
+
+        .toolbar-group {
+          width: 100%;
+          flex-wrap: wrap;
         }
       }
 
@@ -676,8 +639,7 @@
         <div class="devices-toolbar">
           <div class="devices-controls">
             <div class="toolbar-group">
-              <div id="active-filters" class="active-filters" aria-live="polite">
-                <span class="badge badge-blue filters-title">FILTERS</span>
+              <div id="active-filters" class="active-filters hidden" aria-live="polite">
                 <span id="active-filters-chips" class="active-filters-chips"></span>
                 <button id="clear-device-filters" class="clear-filters-btn" type="button">Clear ✕</button>
               </div>
@@ -711,13 +673,17 @@
           <table>
             <thead>
               <tr>
-                <th>Device</th>
-                <th>Badges</th>
-                <th>Session</th>
+                <th class="sortable" data-sort-key="mac">MAC<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="ip">IP<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="hostname">Hostname<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="comments">Comments<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="assignment">Assignment<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="status">Status<span class="sort-indicator">↕</span></th>
+                <th class="sortable" data-sort-key="session">State time<span class="sort-indicator">↕</span></th>
               </tr>
             </thead>
             <tbody id="devices-table">
-              <tr><td class="empty" colspan="3">Loading devices...</td></tr>
+              <tr><td class="empty" colspan="7">Loading devices...</td></tr>
             </tbody>
           </table>
         </div>
@@ -809,18 +775,20 @@
       });
 
       const devicesTable = document.getElementById("devices-table");
+      const deviceSortableHeaders = Array.from(document.querySelectorAll("#devices-panel th.sortable"));
       const autoRefreshToggle = document.getElementById("auto-refresh");
       const displayModeButtons = Array.from(document.querySelectorAll(".mode-segment"));
       const devicesRefreshButton = document.getElementById("devices-refresh");
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
       const clearDeviceFiltersButton = document.getElementById("clear-device-filters");
+      const activeFiltersBlock = document.getElementById("active-filters");
       const activeFiltersChips = document.getElementById("active-filters-chips");
       const devicesStatsLine = document.getElementById("devices-stats-line");
       const autoRefreshState = document.getElementById("auto-refresh-state");
       let refreshTimer = null;
       let deviceItems = [];
       const deviceRowCache = new Map();
-      let activeDeviceSort = { key: "hostname", direction: "asc" };
+      let activeDeviceSort = null;
       let statusFilter = null;
       let assignmentFilter = null;
       let displayMode = "end_devices";
@@ -974,6 +942,21 @@
         return `<div class="badge-wrap">${items.join("")}</div>`;
       };
 
+      const buildStatusMac = (item) => {
+        const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
+        const state = ["online", "offline", "idle", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
+        const cls = state === "online"
+          ? "status-active"
+          : state === "offline"
+            ? "status-inactive"
+            : state === "idle"
+              ? "status-idle"
+              : "status-unknown";
+        const rawArpStatus = String(item.arp_status || "").trim();
+        const tooltip = rawArpStatus ? `${state} (arp status: ${rawArpStatus})` : state;
+        return `<span class="status-mac"><span class="status-dot ${cls}" title="${escapeHtml(tooltip)}"></span><code>${escapeHtml(item.mac || "-")}</code></span>`;
+      };
+
       const normalizeStatus = (item) => {
         const normalizedState = String(item.status || (item.active ? "online" : "offline")).toLowerCase();
         return ["online", "offline", "idle", "unknown"].includes(normalizedState) ? normalizedState : "unknown";
@@ -1035,12 +1018,13 @@
         const hasStatus = Boolean(statusFilter);
         const hasAssignment = Boolean(assignmentFilter);
         const hasAny = hasStatus || hasAssignment;
-        clearDeviceFiltersButton.disabled = !hasAny;
+        activeFiltersBlock.classList.toggle("hidden", !hasAny);
+        if (!hasAny) {
+          activeFiltersChips.innerHTML = "";
+          return;
+        }
 
         const chips = [];
-        if (!hasAny) {
-          chips.push('<span class="active-filters-empty">none</span>');
-        }
         if (hasStatus) {
           const statusMap = {
             online: { className: "badge-green", label: "ONLINE" },
@@ -1134,6 +1118,38 @@
               : "status-unknown";
         const activeClass = statusFilter === state ? "active" : "";
         return `<span class="status-mac status-value ${activeClass}" data-filter-type="status" data-filter-value="${escapeHtml(state)}" role="button" tabindex="0" aria-label="${escapeHtml(`Filter by status ${state}`)}"><span class="status-dot ${cls}"></span>${escapeHtml(state)}</span>`;
+      };
+
+      const buildIpCell = (item) => {
+        const ipText = String(item.ip || "").trim() || "-";
+        const isStale = Boolean(item.ip_is_stale);
+        const staleTitle = "Last seen IP before DHCP lease expired";
+        const parts = [`<span class="${isStale ? "stale-value" : ""}" title="${isStale ? staleTitle : ""}">${escapeHtml(ipText)}</span>`];
+        if (isStale) {
+          parts.push(badge("STALE", "badge-gray", staleTitle));
+        }
+        if (Boolean(item.is_link_local_ip)) {
+          parts.push(badge("LINK-LOCAL", "badge-orange", "APIPA / link-local IP address"));
+        }
+
+        const secondaryCount = Number(item.arp_secondary_count || 0);
+        if (secondaryCount > 0) {
+          const secondary = Array.isArray(item.arp_secondary) ? item.arp_secondary : [];
+          const summary = secondary
+            .map((entry) => `${entry.ip_address || "?"} (${entry.status || "unknown"})`)
+            .join("\n");
+          parts.push(badge(`+${secondaryCount} ARP`, "badge-red", summary || "Additional ARP records"));
+        }
+
+        return `<div class="badge-wrap">${parts.join("")}</div>`;
+      };
+
+      const buildHostnameCell = (item) => {
+        const hostnameText = String(item.hostname || "").trim() || "-";
+        if (!Boolean(item.hostname_is_stale)) {
+          return escapeHtml(hostnameText);
+        }
+        return `<span class="stale-value" title="Last seen hostname before DHCP lease expired">${escapeHtml(hostnameText)}</span>`;
       };
 
       const buildSessionCell = (item) => {
@@ -1354,14 +1370,46 @@
           .map((entry) => entry.item);
       };
 
+      const cycleDirection = (direction) => {
+        if (!direction) {
+          return "asc";
+        }
+        if (direction === "asc") {
+          return "desc";
+        }
+        return null;
+      };
+
+      const applySortHeaderClick = (key) => {
+        if (!activeDeviceSort || activeDeviceSort.key !== key) {
+          activeDeviceSort = { key, direction: "asc" };
+          return;
+        }
+
+        const nextDirection = cycleDirection(activeDeviceSort.direction);
+        if (!nextDirection) {
+          activeDeviceSort = null;
+          return;
+        }
+
+        activeDeviceSort = { key, direction: nextDirection };
+      };
+
       const updateDeviceSortIndicators = () => {
-        const state = !activeDeviceSort
-          ? "Sort"
-          : activeDeviceSort.direction === "asc"
-            ? "Sort A→Z"
-            : "Sort Z→A";
-        devicesClearSortButton.title = state;
-        devicesClearSortButton.setAttribute("aria-label", state);
+        deviceSortableHeaders.forEach((header) => {
+          const key = header.dataset.sortKey;
+          const indicator = header.querySelector(".sort-indicator");
+          if (!indicator) {
+            return;
+          }
+          if (!activeDeviceSort || activeDeviceSort.key !== key) {
+            indicator.textContent = "↕";
+            return;
+          }
+          const direction = activeDeviceSort.direction;
+          const arrow = direction === "asc" ? "↑" : "↓";
+          indicator.textContent = arrow;
+        });
       };
 
       const buildTimerTitle = (element) => {
@@ -1404,36 +1452,21 @@
         const row = document.createElement("tr");
         const cell = document.createElement("td");
         cell.className = "empty";
-        cell.colSpan = 3;
+        cell.colSpan = 7;
         cell.textContent = message;
         row.appendChild(cell);
         return row;
       };
 
-      const buildDeviceCell = (item) => {
-        const hostnameText = String(item.hostname || "").trim() || "-";
-        const hostnameHtml = Boolean(item.hostname_is_stale)
-          ? `<span class="stale-value" title="Last seen hostname before DHCP lease expired">${escapeHtml(hostnameText)}</span>`
-          : escapeHtml(hostnameText);
-        const ipText = String(item.ip || "").trim() || "-";
-        const staleSuffix = Boolean(item.ip_is_stale) ? ' <span class="badge badge-gray">STALE</span>' : "";
-        const ipTitle = Boolean(item.ip_is_stale) ? ' title="Last seen IP before DHCP lease expired"' : "";
-        return `<div class="device-main"><div class="device-name-line">${hostnameHtml} <span${ipTitle}>(${escapeHtml(ipText)})</span>${staleSuffix}</div><div class="device-mac-line"><code>${escapeHtml(item.mac || "-")}</code></div></div>`;
-      };
-
-      const buildBadgesCell = (item) => {
-        const assignmentBadge = buildSemanticAssignmentBadge(item);
-        const commentBadges = buildCommentBadges(item);
-        return `<div class="device-badges-line">${assignmentBadge || ""}${commentBadges || ""}</div>`;
-      };
-
-      const buildSessionStatusCell = (item) => {
-        const status = buildStatusCell(item);
-        const timer = buildSessionCell(item);
-        return `<div class="device-status-line">${status}${timer}</div>`;
-      };
-
-      const renderDeviceRowCells = (item) => [buildDeviceCell(item), buildBadgesCell(item), buildSessionStatusCell(item)];
+      const renderDeviceRowCells = (item) => [
+        buildStatusMac(item),
+        buildIpCell(item),
+        buildHostnameCell(item),
+        buildCommentBadges(item),
+        buildSemanticAssignmentBadge(item),
+        buildStatusCell(item),
+        buildSessionCell(item),
+      ];
 
       const createDeviceRow = (item) => {
         const row = document.createElement("tr");
@@ -1567,13 +1600,7 @@
 
       devicesRefreshButton.addEventListener("click", loadDevices);
       devicesClearSortButton.addEventListener("click", () => {
-        if (!activeDeviceSort) {
-          activeDeviceSort = { key: "hostname", direction: "asc" };
-        } else if (activeDeviceSort.direction === "asc") {
-          activeDeviceSort = { key: "hostname", direction: "desc" };
-        } else {
-          activeDeviceSort = null;
-        }
+        activeDeviceSort = null;
         renderDevicesView();
       });
       clearDeviceFiltersButton.addEventListener("click", () => {
@@ -1660,6 +1687,17 @@
         event.preventDefault();
         target.click();
       });
+      deviceSortableHeaders.forEach((header) => {
+        header.addEventListener("click", () => {
+          const key = String(header.dataset.sortKey || "");
+          if (!key) {
+            return;
+          }
+          applySortHeaderClick(key);
+          renderDevicesView();
+        });
+      });
+
       sortRows();
       setCounts();
       updateDeviceSortIndicators();
