@@ -436,26 +436,6 @@ def _changed_device_fields(previous: dict[str, Any], current: dict[str, Any]) ->
     return changed
 
 
-def _has_perm_badge(device: dict[str, Any]) -> bool:
-    badges = device.get("badges", [])
-    if not isinstance(badges, list):
-        return False
-    normalized_badges = [str(item).strip().upper() for item in badges if str(item).strip()]
-    return "PERM" in normalized_badges
-
-
-def _is_perm_device(device: dict[str, Any]) -> bool:
-    return normalize_arp_status(device.get("arp_status", "")) == "permanent" or _has_perm_badge(device)
-
-
-def _presence_state_from_snapshot(device: dict[str, Any], fallback_state: str) -> str:
-    for key in ("arp_state", "fused_state", "state"):
-        candidate = _normalized_presence_state(device.get(key, ""))
-        if candidate != "unknown":
-            return candidate
-    return _normalized_presence_state(fallback_state)
-
-
 def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
     previous_snapshot_path = _latest_snapshot_path()
     previous_devices: list[dict[str, Any]] = []
@@ -519,18 +499,12 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             now=now_dt,
             logger_level=logging.INFO,
         )
-        previous_presence_state_from_snapshot = _presence_state_from_snapshot(previous, previous_effective_state)
 
         merge_current_state = current_state
         decision = "apply_transition_rules"
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(device.get("bridge_host_present", False))
         bridge_host_lost = previous_bridge_host_present and not current_bridge_host_present
-        perm_reconnect_candidate = (
-            previous_presence_state_from_snapshot == "offline"
-            and _normalized_presence_state(current_state) in {"online", "idle"}
-            and _is_perm_device(device)
-        )
         idle_timeout_should_force_offline = (
             previous_state == "idle"
             and current_state != "online"
@@ -572,7 +546,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         elif current_state == "unknown" and _has_presence_evidence(device):
             merge_current_state = previous_effective_state
             decision = "unknown_with_evidence_preserved_previous_state"
-        elif current_state == "idle" and previous_effective_state == "offline" and not perm_reconnect_candidate:
+        elif current_state == "idle" and previous_effective_state == "offline":
             merge_current_state = "offline"
             device["arp_state"] = "offline"
             device["fused_state"] = "offline"
@@ -585,12 +559,6 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous_presence_state, current_presence_state = _sanitize_presence_transition(
             transition_previous_state,
             merge_current_state,
-        )
-        current_presence_state_for_perm = _normalized_presence_state(merge_current_state)
-        force_perm_reconnect = (
-            previous_presence_state_from_snapshot == "offline"
-            and current_presence_state_for_perm in {"online", "idle"}
-            and _is_perm_device(device)
         )
         previous_state_changed_at = previous.get("state_changed_at")
         previous_online_since = previous.get("online_since")
@@ -608,23 +576,6 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 previous_source,
                 current_source,
             )
-
-        if force_perm_reconnect:
-            logger.info("PERM reconnect detected for MAC %s", mac)
-            device["state_changed_at"] = now_iso
-            device["online_since"] = now_iso
-            device["idle_since"] = None
-            device["offline_since"] = None
-            logger.info("Forced session reset applied for PERM device")
-            logger.info("online_since overridden due to PERM reconnect")
-            _initialize_missing_session_timestamps(
-                device=device,
-                presence_state="online",
-                now_iso=now_iso,
-                mac=mac,
-            )
-            enriched_devices.append(device)
-            continue
 
         if transition_previous_state != merge_current_state:
             device["state_changed_at"] = now_iso

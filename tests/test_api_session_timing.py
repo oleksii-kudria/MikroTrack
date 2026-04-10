@@ -512,61 +512,6 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIn(item["status"], {"idle", "offline"})
         self.assertNotEqual(item["status"], "unknown")
 
-    def test_api_keeps_newer_snapshot_online_since_when_event_online_since_is_older(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            os.environ["PERSISTENCE_PATH"] = tmp
-            Path(tmp, "2026-04-08T10-10-00.json").write_text(
-                json.dumps(
-                    [
-                        {
-                            "mac_address": "AA:AA:AA:AA:AA:3B",
-                            "ip_address": "192.168.88.41",
-                            "source": ["arp"],
-                            "arp_status": "permanent",
-                            "arp_state": "idle",
-                            "state_changed_at": "2026-04-08T10:15:00+00:00",
-                            "online_since": "2026-04-08T10:12:00+00:00",
-                            "idle_since": "2026-04-08T10:15:00+00:00",
-                            "offline_since": None,
-                        }
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            Path(tmp, "events.jsonl").write_text(
-                "\n".join(
-                    [
-                        json.dumps(
-                            {
-                                "timestamp": "2026-04-08T10:05:00+00:00",
-                                "event_type": "state_changed",
-                                "mac": "AA:AA:AA:AA:AA:3B",
-                                "old_state": "offline",
-                                "new_state": "online",
-                            }
-                        ),
-                        json.dumps(
-                            {
-                                "timestamp": "2026-04-08T10:20:00+00:00",
-                                "event_type": "state_changed",
-                                "mac": "AA:AA:AA:AA:AA:3B",
-                                "old_state": "online",
-                                "new_state": "idle",
-                            }
-                        ),
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            payload = list_devices()
-            item = payload["items"][0]
-
-        self.assertEqual(item["state_changed_at"], "2026-04-08T10:20:00+00:00")
-        self.assertEqual(item["online_since"], "2026-04-08T10:12:00+00:00")
-        self.assertEqual(item["idle_since"], "2026-04-08T10:20:00+00:00")
-
 
 if __name__ == "__main__":
     unittest.main()

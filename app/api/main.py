@@ -250,16 +250,6 @@ def _resolve_api_state(
     return "unknown"
 
 
-def _prefer_newer_timestamp(snapshot_ts: datetime | None, event_ts: datetime | None) -> datetime | None:
-    if isinstance(snapshot_ts, datetime) and isinstance(event_ts, datetime):
-        return snapshot_ts if snapshot_ts >= event_ts else event_ts
-    if isinstance(snapshot_ts, datetime):
-        return snapshot_ts
-    if isinstance(event_ts, datetime):
-        return event_ts
-    return None
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -406,9 +396,9 @@ def list_devices() -> dict[str, object]:
                     mac,
                 )
                 state_changed_at = event_state_changed_at
-                online_since = _prefer_newer_timestamp(online_since, session.get("online_since"))
-                idle_since = _prefer_newer_timestamp(idle_since, session.get("idle_since"))
-                offline_since = _prefer_newer_timestamp(offline_since, session.get("offline_since"))
+                online_since = session.get("online_since")
+                idle_since = session.get("idle_since")
+                offline_since = session.get("offline_since")
             else:
                 if not isinstance(state_changed_at, datetime):
                     state_changed_at = event_state_changed_at

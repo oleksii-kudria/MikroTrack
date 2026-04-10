@@ -1354,59 +1354,6 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIsNone(snapshot["idle_since"])
         self.assertEqual(snapshot["offline_since"], "2026-04-08T10:21:00+00:00")
 
-    def test_save_snapshot_perm_offline_to_idle_forces_new_online_session(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
-            Path(tmp, "2020-01-01T00-00-00.json").write_text(
-                json.dumps(
-                    [
-                        {
-                            "mac_address": "AA:AA:AA:AA:AA:60",
-                            "ip_address": "192.168.88.60",
-                            "source": ["arp"],
-                            "arp_status": "permanent",
-                            "arp_state": "offline",
-                            "fused_state": "offline",
-                            "badges": ["PERM"],
-                            "state_changed_at": "2026-04-08T11:10:00+00:00",
-                            "online_since": "2026-04-08T10:00:00+00:00",
-                            "idle_since": None,
-                            "offline_since": "2026-04-08T11:10:00+00:00",
-                        }
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T11:15:00+00:00"):
-                with self.assertLogs("mikrotrack", level="INFO") as logs:
-                    save_snapshot(
-                        [
-                            {
-                                "mac_address": "AA:AA:AA:AA:AA:60",
-                                "ip_address": "192.168.88.60",
-                                "source": ["arp"],
-                                "arp_status": "permanent",
-                                "arp_state": "idle",
-                                "fused_state": "idle",
-                                "badges": ["PERM"],
-                                "bridge_host_present": False,
-                            }
-                        ]
-                    )
-
-            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
-            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
-
-        output = "\n".join(logs.output)
-        self.assertIn("PERM reconnect detected for MAC AA:AA:AA:AA:AA:60", output)
-        self.assertIn("Forced session reset applied for PERM device", output)
-        self.assertIn("online_since overridden due to PERM reconnect", output)
-        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T11:15:00+00:00")
-        self.assertEqual(snapshot["online_since"], "2026-04-08T11:15:00+00:00")
-        self.assertIsNone(snapshot["idle_since"])
-        self.assertIsNone(snapshot["offline_since"])
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
