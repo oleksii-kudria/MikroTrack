@@ -768,6 +768,8 @@
         const dhcpIsDynamic = dhcpFlag === "D";
         const arpIsStatic = arpFlag.startsWith("S");
         const dhcpIsStatic = dhcpFlag === "S";
+        const bridgeHostPresent = Boolean(flags.bridge_host_present);
+        const bridgeOnly = !flags.has_arp_entry && !hasDhcpLease && bridgeHostPresent;
 
         if (arpIsStatic) {
           return badge("PERM", "badge-purple", "Pinned device", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
@@ -781,6 +783,9 @@
 
         if (!hasDhcpLease && arpFlag === "DC") {
           return badge("COMPLETE", "badge-green", "Complete ARP record without DHCP lease", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
+        }
+        if (bridgeOnly) {
+          return badge("BRIDGE", "badge-blue", "BRIDGE - Device detected only via bridge (no ARP, no DHCP)", { extraClass: `${clickableClass} ${activeClass}`.trim(), attrs: clickableAttrs });
         }
 
         return "";
@@ -843,6 +848,8 @@
         const dhcpIsDynamic = dhcpFlag === "D";
         const arpIsStatic = arpFlag.startsWith("S");
         const dhcpIsStatic = dhcpFlag === "S";
+        const bridgeHostPresent = Boolean(flags.bridge_host_present);
+        const bridgeOnly = !flags.has_arp_entry && !hasDhcpLease && bridgeHostPresent;
 
         if (arpIsStatic) {
           return "PERM";
@@ -855,6 +862,9 @@
         }
         if (!hasDhcpLease && arpFlag === "DC") {
           return "COMPLETE";
+        }
+        if (bridgeOnly) {
+          return "BRIDGE";
         }
 
         return null;
@@ -1057,6 +1067,8 @@
         const dhcpIsDynamic = dhcpFlag === "D";
         const arpIsStatic = arpFlag.startsWith("S");
         const dhcpIsStatic = dhcpFlag === "S";
+        const bridgeHostPresent = Boolean(flags.bridge_host_present);
+        const bridgeOnly = !flags.has_arp_entry && !hasDhcpLease && bridgeHostPresent;
         if (arpIsStatic) {
           return "perm";
         }
@@ -1068,6 +1080,9 @@
         }
         if (!hasDhcpLease && arpFlag === "DC") {
           return "complete";
+        }
+        if (bridgeOnly) {
+          return "bridge";
         }
         return null;
       };

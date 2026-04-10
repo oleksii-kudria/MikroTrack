@@ -315,6 +315,12 @@ def build_devices(
             badges.append("PERM")
         if _is_link_local(str(device.get("ip_address", ""))):
             badges.append("LINK-LOCAL")
+        if (
+            not bool(device.get("has_arp_entry", False))
+            and not bool(device.get("has_dhcp_lease", False))
+            and bridge_host_present
+        ):
+            badges.append("BRIDGE")
 
         interface = interface_by_mac.get(_normalize_mac(device.get("mac_address", "")))
         if interface is not None:

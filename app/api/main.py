@@ -340,6 +340,7 @@ def list_devices() -> dict[str, object]:
             has_arp_entry = raw_has_arp_entry
         else:
             has_arp_entry = "arp" in source_tokens
+        bridge_host_present = bool(device.get("bridge_host_present", False) or "bridge_host" in source_tokens)
         dhcp_flag = _dhcp_flag(has_dhcp_lease, dhcp_flags, dhcp_is_dynamic)
         arp_flag = _arp_flag(has_arp_entry, arp_flags)
         device_state = _device_state(device)
@@ -413,6 +414,7 @@ def list_devices() -> dict[str, object]:
                     "dhcp_flag": dhcp_flag,
                     "has_dhcp_lease": has_dhcp_lease,
                     "has_arp_entry": has_arp_entry,
+                    "bridge_host_present": bridge_host_present,
                     "arp_flag": arp_flag,
                     "state": resolved_state,
                 },
