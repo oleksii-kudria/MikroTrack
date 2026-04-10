@@ -344,11 +344,8 @@ def _resolve_previous_effective_state(
 ) -> str:
     previous_state = _derive_device_state(previous)
     previous_offline_since = _parse_snapshot_timestamp(previous.get("offline_since"))
-    previous_online_since = _parse_snapshot_timestamp(previous.get("online_since"))
 
-    has_valid_offline_boundary = previous_offline_since is not None and (
-        previous_online_since is None or previous_offline_since >= previous_online_since
-    )
+    has_valid_offline_boundary = previous_offline_since is not None
     if has_valid_offline_boundary:
         logger.log(
             logger_level,
