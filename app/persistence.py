@@ -311,13 +311,16 @@ def _sanitize_presence_transition(previous_state: str, current_state: str) -> tu
 
 
 def _derive_device_state(device: dict[str, Any]) -> str:
+    bridge_host_present = bool(device.get("bridge_host_present", False))
+    if bridge_host_present:
+        return "online"
+
     fused_state = str(device.get("fused_state", "")).strip().lower()
     if fused_state:
         return _normalized_device_state(fused_state)
 
     # Backward-compatible fallback for old snapshots without fused_state.
     arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
-    bridge_host_present = bool(device.get("bridge_host_present", False))
     return _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
 
 
@@ -478,6 +481,11 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device["arp_state"] = merge_current_state
             device["fused_state"] = merge_current_state
             decision = "bridge_host_lost_recalculated_state"
+        elif current_bridge_host_present:
+            merge_current_state = "online"
+            device["arp_state"] = "online"
+            device["fused_state"] = "online"
+            decision = "bridge_host_present_forced_online"
         elif current_state == "unknown" and _has_presence_evidence(device):
             merge_current_state = previous_state
             decision = "unknown_with_evidence_preserved_previous_state"

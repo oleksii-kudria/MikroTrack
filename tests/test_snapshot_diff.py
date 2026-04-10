@@ -644,6 +644,55 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(by_type["state_changed"]["new_state"], "idle")
         self.assertIn("device_idle", by_type)
 
+    def test_save_snapshot_bridge_host_reconnect_forces_online_and_clears_idle_since(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:4B",
+                            "ip_address": "192.168.88.75",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                            "fused_state": "idle",
+                            "bridge_host_present": False,
+                            "state_changed_at": "2026-04-08T15:10:00+00:00",
+                            "online_since": "2026-04-08T15:00:00+00:00",
+                            "idle_since": "2026-04-08T15:10:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T15:20:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:4B",
+                            "ip_address": "192.168.88.75",
+                            "source": ["arp", "bridge_host"],
+                            "arp_status": "stale",
+                            "arp_state": "idle",
+                            "fused_state": "idle",
+                            "bridge_host_present": True,
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["fused_state"], "online")
+        self.assertEqual(snapshot["arp_state"], "online")
+        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T15:20:00+00:00")
+        self.assertEqual(snapshot["online_since"], "2026-04-08T15:00:00+00:00")
+        self.assertIsNone(snapshot["idle_since"])
+        self.assertIsNone(snapshot["offline_since"])
+
     def test_save_snapshot_preserves_identity_for_mac_with_different_letter_case(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7)
