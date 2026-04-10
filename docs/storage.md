@@ -108,25 +108,6 @@ chmod 755 /data/snapshots
 
 Події записуються у `events.jsonl` в тій же директорії `PERSISTENCE_PATH`. Це підготовка до інтеграції web UI (таймлайн/історія змін).
 
-### PERM reconnect: примусовий reset сесії
-
-Для пристроїв із `arp_status=permanent` або бейджем `PERM` перехід `offline -> online` (включно з `offline -> idle`, де `idle` є підстаном online-присутності) завжди відкриває нову сесію примусово.
-
-Під час цього reconnect застосовується force reset:
-
-- `online_since = now`
-- `idle_since = null`
-- `offline_since = null`
-- `state_changed_at = now`
-
-Це прибирає edge-case, коли `online_since` міг залишатись зі старої сесії для static/permanent ARP.
-
-Логи (INFO):
-
-- `PERM reconnect detected for MAC XX:XX:XX:XX:XX:XX`
-- `Forced session reset applied for PERM device`
-- `online_since overridden due to PERM reconnect`
-
 ### Підсумок змін (INFO)
 
 - `Diff summary:`
@@ -260,25 +241,6 @@ If no previous snapshot exists:
 ### Event persistence
 
 Events are appended to `events.jsonl` in the same `PERSISTENCE_PATH` directory, preparing data for a web UI timeline/history view.
-
-### PERM reconnect: forced session reset
-
-For devices with `arp_status=permanent` or a `PERM` badge, an `offline -> online` transition (including `offline -> idle`, where `idle` is an online-presence sub-state) always opens a new session by force.
-
-During this reconnect, MikroTrack applies:
-
-- `online_since = now`
-- `idle_since = null`
-- `offline_since = null`
-- `state_changed_at = now`
-
-This removes an edge-case where `online_since` could be carried over from an older session for static/permanent ARP devices.
-
-INFO logs:
-
-- `PERM reconnect detected for MAC XX:XX:XX:XX:XX:XX`
-- `Forced session reset applied for PERM device`
-- `online_since overridden due to PERM reconnect`
 
 ### Diff summary (INFO)
 
