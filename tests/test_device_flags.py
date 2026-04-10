@@ -221,7 +221,7 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
 
         self.assertEqual(devices[0]["arp_status"], "permanent")
         self.assertEqual(devices[0]["arp_state"], "idle")
-        self.assertIn("PERM", devices[0]["badges"])
+        self.assertIn("STATIC", devices[0]["badges"])
 
     def test_builder_promotes_permanent_to_online_when_bridge_host_present(self) -> None:
         devices = build_devices(
@@ -236,7 +236,7 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertEqual(devices[0]["arp_state"], "online")
         self.assertTrue(devices[0]["bridge_host_present"])
         self.assertIn("bridge_host", devices[0]["source"])
-        self.assertIn("PERM", devices[0]["badges"])
+        self.assertIn("STATIC", devices[0]["badges"])
 
     def test_builder_adds_bridge_badge_for_bridge_only_device(self) -> None:
         devices = build_devices(
@@ -310,7 +310,7 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         )
 
         self.assertIn("RANDOM", devices[0]["badges"])
-        self.assertNotIn("PERM", devices[0]["badges"])
+        self.assertNotIn("STATIC", devices[0]["badges"])
 
 
 if __name__ == "__main__":

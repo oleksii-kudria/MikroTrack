@@ -339,26 +339,23 @@ def _sanitize_presence_transition(
 def _derive_device_state(device: dict[str, Any]) -> str:
     bridge_host_present = bool(device.get("bridge_host_present", False))
     arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
-    mac = str(device.get("mac_address", "")).strip().upper()
-
     if arp_status == "permanent":
-        normalized_perm_state = "online" if bridge_host_present else "idle"
-        logger.info(
-            "PERM state normalized to idle/online for MAC %s (resolved=%s)",
-            mac or "unknown",
-            normalized_perm_state,
-        )
-        return normalized_perm_state
+        logger.info("ARP permanent entry is treated as STATIC metadata for MAC %s", str(device.get("mac_address", "")).strip().upper() or "unknown")
 
     if bridge_host_present:
+        logger.debug("State resolved using generic presence rules for MAC %s (state=online)", str(device.get("mac_address", "")).strip().upper() or "unknown")
         return "online"
 
     fused_state = str(device.get("fused_state", "")).strip().lower()
     if fused_state:
-        return _normalized_device_state(fused_state)
+        resolved = _normalized_device_state(fused_state)
+        logger.debug("State resolved using generic presence rules for MAC %s (state=%s)", str(device.get("mac_address", "")).strip().upper() or "unknown", resolved)
+        return resolved
 
     # Backward-compatible fallback for old snapshots without fused_state.
-    return _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
+    resolved = _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
+    logger.debug("State resolved using generic presence rules for MAC %s (state=%s)", str(device.get("mac_address", "")).strip().upper() or "unknown", resolved)
+    return resolved
 
 
 def _resolve_previous_effective_state(
@@ -532,7 +529,6 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             bridge_host_present=bool(device.get("bridge_host_present", False)),
             evidence=device.get("evidence") if isinstance(device.get("evidence"), dict) else None,
         )
-        is_perm_without_bridge = current_arp_status == "permanent" and not bool(device.get("bridge_host_present", False))
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(device.get("bridge_host_present", False))
         bridge_host_lost = previous_bridge_host_present and not current_bridge_host_present
@@ -577,15 +573,6 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         elif current_state == "unknown" and _has_presence_evidence(device):
             merge_current_state = previous_effective_state
             decision = "unknown_with_evidence_preserved_previous_state"
-        elif previous_effective_state == "offline" and is_perm_without_bridge and not current_has_reconnect_evidence:
-            merge_current_state = "offline"
-            device["arp_state"] = "offline"
-            device["fused_state"] = "offline"
-            device["status"] = "offline"
-            device["active"] = False
-            decision = "skip_false_perm_reconnect"
-            logger.info("Skipping false reconnect for PERM device MAC %s", mac)
-            logger.info("PERM device remains offline due to lack of bridge_host evidence")
         elif current_state == "idle" and previous_effective_state == "offline":
             merge_current_state = "offline"
             device["arp_state"] = "offline"

@@ -499,7 +499,7 @@ class SnapshotDiffTests(unittest.TestCase):
                         "arp_status": "reachable",
                         "arp_state": "online",
                         "arp_comment": "manual",
-                        "badges": ["PERM"],
+                        "badges": ["STATIC"],
                     }
                 ]
             )
@@ -1280,7 +1280,7 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIsNone(snapshot["idle_since"])
         self.assertEqual(snapshot["offline_since"], "2026-04-08T10:21:00+00:00")
 
-    def test_diff_normalizes_permanent_without_bridge_to_idle(self) -> None:
+    def test_diff_treats_permanent_as_generic_presence_without_special_case(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "2026-04-08T10-05-00.json").write_text(
                 json.dumps(
@@ -1314,8 +1314,10 @@ class SnapshotDiffTests(unittest.TestCase):
             )
 
         by_type = {event["event_type"]: event for event in events}
-        self.assertNotIn("state_changed", by_type)
-        self.assertNotIn("device_offline", by_type)
+        self.assertIn("state_changed", by_type)
+        self.assertIn("device_offline", by_type)
+        self.assertEqual(by_type["state_changed"]["old_state"], "idle")
+        self.assertEqual(by_type["state_changed"]["new_state"], "offline")
 
     def test_save_snapshot_perm_offline_idle_loop_does_not_reconnect_without_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

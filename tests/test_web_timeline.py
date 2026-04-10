@@ -47,12 +47,12 @@ class TimelineFormattingTests(unittest.TestCase):
             {
                 "event_type": "arp_state_changed",
                 "old_value": "online",
-                "new_value": "permanent",
+                "new_value": "idle",
             }
         )
 
         self.assertEqual(status_description, "ARP status changed from reachable to permanent")
-        self.assertEqual(state_description, "ARP state changed from online to permanent")
+        self.assertEqual(state_description, "ARP state changed from online to idle")
 
     def test_groups_events_by_mac_and_timestamp_window(self) -> None:
         events = [

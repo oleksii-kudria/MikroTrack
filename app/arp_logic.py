@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-_IDLE_ARP_STATUSES = {"stale"}
+_IDLE_ARP_STATUSES = {"stale", "permanent"}
 _OFFLINE_ARP_STATUSES = {"failed", "incomplete"}
 _ONLINE_ARP_STATUSES = {"reachable", "complete", "delay", "probe"}
 
@@ -21,8 +21,6 @@ def arp_state_from_status(raw_status: Any) -> str:
         return "idle"
     if status in _OFFLINE_ARP_STATUSES:
         return "offline"
-    if status == "permanent":
-        return "permanent"
     return "unknown"
 
 
@@ -31,8 +29,6 @@ def fused_device_state(raw_status: Any, bridge_host_present: bool) -> str:
 
     if status in _ONLINE_ARP_STATUSES:
         return "online"
-    if status == "permanent":
-        return "online" if bridge_host_present else "idle"
     if bridge_host_present:
         return "online"
     if status in _IDLE_ARP_STATUSES:
