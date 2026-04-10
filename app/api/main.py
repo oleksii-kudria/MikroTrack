@@ -384,14 +384,30 @@ def list_devices() -> dict[str, object]:
         idle_since = _parse_ts(str(device.get("idle_since", "")))
         offline_since = _parse_ts(str(device.get("offline_since", "")))
 
-        if not isinstance(state_changed_at, datetime) and isinstance(session, dict):
-            state_changed_at = session.get("state_changed_at")
-        if not isinstance(online_since, datetime) and isinstance(session, dict):
-            online_since = session.get("online_since")
-        if not isinstance(idle_since, datetime) and isinstance(session, dict):
-            idle_since = session.get("idle_since")
-        if not isinstance(offline_since, datetime) and isinstance(session, dict):
-            offline_since = session.get("offline_since")
+        if isinstance(session, dict):
+            event_state_changed_at = session.get("state_changed_at")
+            should_override_from_events = isinstance(event_state_changed_at, datetime) and (
+                not isinstance(state_changed_at, datetime) or event_state_changed_at >= state_changed_at
+            )
+
+            if should_override_from_events:
+                logger.info(
+                    "API: overriding snapshot session timestamps with newer event data for MAC %s",
+                    mac,
+                )
+                state_changed_at = event_state_changed_at
+                online_since = session.get("online_since")
+                idle_since = session.get("idle_since")
+                offline_since = session.get("offline_since")
+            else:
+                if not isinstance(state_changed_at, datetime):
+                    state_changed_at = event_state_changed_at
+                if not isinstance(online_since, datetime):
+                    online_since = session.get("online_since")
+                if not isinstance(idle_since, datetime):
+                    idle_since = session.get("idle_since")
+                if not isinstance(offline_since, datetime):
+                    offline_since = session.get("offline_since")
 
         resolved_state = _resolve_api_state(
             mac=mac,

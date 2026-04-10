@@ -385,6 +385,133 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertEqual(item["flags"]["state"], "online")
         self.assertIsNone(item["idle_duration_seconds"])
 
+    def test_api_prefers_newer_event_session_timestamps_over_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:38",
+                            "ip_address": "192.168.88.38",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": None,
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            Path(tmp, "events.jsonl").write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-04-08T10:12:00+00:00",
+                        "event_type": "state_changed",
+                        "mac": "AA:AA:AA:AA:AA:38",
+                        "old_state": "offline",
+                        "new_state": "online",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["online_since"], "2026-04-08T10:12:00+00:00")
+        self.assertEqual(item["state_changed_at"], "2026-04-08T10:12:00+00:00")
+
+    def test_perm_reconnect_resets_session_timer_from_event_stream(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            reconnect_ts = datetime.now(UTC).replace(microsecond=0)
+            reconnect_iso = reconnect_ts.isoformat()
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:39",
+                            "ip_address": "192.168.88.39",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "idle",
+                            "state_changed_at": reconnect_iso,
+                            "online_since": reconnect_iso,
+                            "idle_since": None,
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            Path(tmp, "events.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "timestamp": "2026-04-08T10:00:00+00:00",
+                                "event_type": "state_changed",
+                                "mac": "AA:AA:AA:AA:AA:39",
+                                "old_state": "online",
+                                "new_state": "offline",
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "timestamp": reconnect_iso,
+                                "event_type": "state_changed",
+                                "mac": "AA:AA:AA:AA:AA:39",
+                                "old_state": "offline",
+                                "new_state": "online",
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertEqual(item["status"], "online")
+        self.assertEqual(item["online_since"], reconnect_iso)
+        self.assertLessEqual(item["presence_duration_seconds"], 2)
+
+    def test_perm_without_bridge_never_resolves_to_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:3A",
+                            "ip_address": "192.168.88.40",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "idle",
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": "2026-04-08T10:01:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            Path(tmp, "events.jsonl").write_text("", encoding="utf-8")
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertIn(item["status"], {"idle", "offline"})
+        self.assertNotEqual(item["status"], "unknown")
+
 
 if __name__ == "__main__":
     unittest.main()
