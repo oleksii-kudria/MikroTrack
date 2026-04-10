@@ -946,6 +946,90 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertIsNone(snapshot["idle_since"])
         self.assertEqual(snapshot["offline_since"], "2026-04-08T10:21:00+00:00")
 
+    def test_save_snapshot_idle_timeout_forces_offline_for_permanent_without_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2020-01-01T00-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:59",
+                            "ip_address": "192.168.88.59",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "fused_state": "idle",
+                            "bridge_host_present": False,
+                            "state_changed_at": "2026-04-08T10:05:00+00:00",
+                            "online_since": "2026-04-08T10:00:00+00:00",
+                            "idle_since": "2026-04-08T10:05:00+00:00",
+                            "offline_since": None,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T10:21:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:59",
+                            "ip_address": "192.168.88.59",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "permanent",
+                            "fused_state": "unknown",
+                            "bridge_host_present": False,
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["fused_state"], "offline")
+        self.assertEqual(snapshot["arp_state"], "offline")
+        self.assertEqual(snapshot["state_changed_at"], "2026-04-08T10:21:00+00:00")
+        self.assertIsNone(snapshot["online_since"])
+        self.assertIsNone(snapshot["idle_since"])
+        self.assertEqual(snapshot["offline_since"], "2026-04-08T10:21:00+00:00")
+
+    def test_diff_marks_idle_timeout_reason_for_permanent_device_offline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "2026-04-08T10-05-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:5A",
+                            "ip_address": "192.168.88.90",
+                            "source": ["arp"],
+                            "arp_status": "stale",
+                            "fused_state": "idle",
+                            "bridge_host_present": False,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+
+            events = process_snapshot_diff(
+                [
+                    {
+                        "mac_address": "AA:AA:AA:AA:AA:5A",
+                        "ip_address": "192.168.88.90",
+                        "source": ["arp"],
+                        "arp_status": "permanent",
+                        "arp_state": "permanent",
+                        "fused_state": "offline",
+                        "bridge_host_present": False,
+                    }
+                ]
+            )
+
+        by_type = {event["event_type"]: event for event in events}
+        self.assertEqual(by_type["device_offline"]["reason"], "idle_timeout")
+
     def test_save_snapshot_idle_within_timeout_preserves_online_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
