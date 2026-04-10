@@ -1317,6 +1317,106 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertNotIn("state_changed", by_type)
         self.assertNotIn("device_offline", by_type)
 
+    def test_save_snapshot_perm_offline_idle_loop_does_not_reconnect_without_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2026-04-08T10-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:6A",
+                            "ip_address": "192.168.88.106",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "offline",
+                            "fused_state": "offline",
+                            "status": "offline",
+                            "active": False,
+                            "bridge_host_present": False,
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": None,
+                            "idle_since": None,
+                            "offline_since": "2026-04-08T10:00:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T10:10:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:6A",
+                            "ip_address": "192.168.88.106",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "offline",
+                            "fused_state": "idle",
+                            "bridge_host_present": False,
+                            "status": "online",
+                            "active": True,
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["fused_state"], "offline")
+        self.assertEqual(snapshot["arp_state"], "offline")
+        self.assertEqual(snapshot["status"], "offline")
+        self.assertFalse(snapshot["active"])
+        self.assertEqual(snapshot["offline_since"], "2026-04-08T10:00:00+00:00")
+        self.assertIsNone(snapshot["online_since"])
+
+    def test_save_snapshot_perm_offline_reconnects_when_bridge_host_returns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
+            Path(tmp, "2026-04-08T10-00-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:6B",
+                            "ip_address": "192.168.88.107",
+                            "source": ["arp"],
+                            "arp_status": "permanent",
+                            "arp_state": "offline",
+                            "fused_state": "offline",
+                            "bridge_host_present": False,
+                            "state_changed_at": "2026-04-08T10:00:00+00:00",
+                            "online_since": None,
+                            "idle_since": None,
+                            "offline_since": "2026-04-08T10:00:00+00:00",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.persistence._iso_timestamp", return_value="2026-04-08T10:15:00+00:00"):
+                save_snapshot(
+                    [
+                        {
+                            "mac_address": "AA:AA:AA:AA:AA:6B",
+                            "ip_address": "192.168.88.107",
+                            "source": ["arp", "bridge_host"],
+                            "arp_status": "permanent",
+                            "arp_state": "idle",
+                            "fused_state": "idle",
+                            "bridge_host_present": True,
+                        }
+                    ]
+                )
+
+            snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
+
+        self.assertEqual(snapshot["fused_state"], "online")
+        self.assertEqual(snapshot["arp_state"], "online")
+        self.assertEqual(snapshot["online_since"], "2026-04-08T10:15:00+00:00")
+        self.assertIsNone(snapshot["offline_since"])
+
     def test_save_snapshot_idle_within_timeout_preserves_online_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)

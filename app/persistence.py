@@ -298,14 +298,40 @@ def _normalized_presence_state(state: str) -> str:
     return normalized if normalized in {"online", "idle", "offline"} else "unknown"
 
 
-def _sanitize_presence_transition(previous_state: str, current_state: str) -> tuple[str, str]:
+def _has_reconnect_evidence(
+    *,
+    arp_status: str,
+    bridge_host_present: bool,
+    evidence: dict[str, Any] | None = None,
+) -> bool:
+    if bridge_host_present:
+        return True
+
+    if normalize_arp_status(arp_status) in {"reachable", "complete"}:
+        return True
+
+    if isinstance(evidence, dict):
+        if bool(evidence.get("bridge_host_present", False)):
+            return True
+        if normalize_arp_status(evidence.get("arp_status", "unknown")) in {"reachable", "complete"}:
+            return True
+
+    return False
+
+
+def _sanitize_presence_transition(
+    previous_state: str,
+    current_state: str,
+    *,
+    has_reconnect_evidence: bool = False,
+) -> tuple[str, str]:
     prev = _normalized_presence_state(previous_state)
     curr = _normalized_presence_state(current_state)
 
     # Idle is a sub-state of the online presence session.
-    # Transition offline -> idle is invalid and must become a new online session.
+    # Transition offline -> idle can only become online when fresh reconnect evidence exists.
     if prev == "offline" and curr == "idle":
-        curr = "online"
+        curr = "online" if has_reconnect_evidence else "offline"
 
     return prev, curr
 
@@ -499,6 +525,13 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
 
         merge_current_state = current_state
         decision = "apply_transition_rules"
+        current_arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
+        current_has_reconnect_evidence = _has_reconnect_evidence(
+            arp_status=current_arp_status,
+            bridge_host_present=bool(device.get("bridge_host_present", False)),
+            evidence=device.get("evidence") if isinstance(device.get("evidence"), dict) else None,
+        )
+        is_perm_without_bridge = current_arp_status == "permanent" and not bool(device.get("bridge_host_present", False))
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(device.get("bridge_host_present", False))
         bridge_host_lost = previous_bridge_host_present and not current_bridge_host_present
@@ -543,6 +576,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         elif current_state == "unknown" and _has_presence_evidence(device):
             merge_current_state = previous_effective_state
             decision = "unknown_with_evidence_preserved_previous_state"
+        elif previous_effective_state == "offline" and is_perm_without_bridge and not current_has_reconnect_evidence:
+            merge_current_state = "offline"
+            device["arp_state"] = "offline"
+            device["fused_state"] = "offline"
+            device["status"] = "offline"
+            device["active"] = False
+            decision = "skip_false_perm_reconnect"
+            logger.info("Skipping false reconnect for PERM device MAC %s", mac)
+            logger.info("PERM device remains offline due to lack of bridge_host evidence")
         elif current_state == "idle" and previous_effective_state == "offline":
             merge_current_state = "offline"
             device["arp_state"] = "offline"
@@ -556,6 +598,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous_presence_state, current_presence_state = _sanitize_presence_transition(
             transition_previous_state,
             merge_current_state,
+            has_reconnect_evidence=current_has_reconnect_evidence,
         )
         previous_state_changed_at = previous.get("state_changed_at")
         previous_online_since = previous.get("online_since")
@@ -609,6 +652,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 now_iso=now_iso,
                 mac=mac,
             )
+            if current_presence_state == "offline" and not bool(device.get("bridge_host_present", False)):
+                device["status"] = "offline"
+                device["active"] = False
 
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
@@ -654,6 +700,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 now_iso=now_iso,
                 mac=mac,
             )
+            if current_presence_state == "offline" and not bool(device.get("bridge_host_present", False)):
+                device["status"] = "offline"
+                device["active"] = False
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
                 "old_online_since=%s new_online_since=%s "
@@ -698,6 +747,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 now_iso=now_iso,
                 mac=mac,
             )
+            if current_presence_state == "offline" and not bool(device.get("bridge_host_present", False)):
+                device["status"] = "offline"
+                device["active"] = False
             logger.debug(
                 "state timestamp merge: mac=%s old_state=%s new_state=%s device_changed=%s changed_fields=%s "
                 "old_online_since=%s new_online_since=%s "
@@ -1045,6 +1097,11 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             previous_presence_state, current_presence_state = _sanitize_presence_transition(
                 previous_effective_state,
                 current_fused_state,
+                has_reconnect_evidence=_has_reconnect_evidence(
+                    arp_status=current_arp_status,
+                    bridge_host_present=current_bridge_host_present,
+                    evidence=current.get("evidence") if isinstance(current.get("evidence"), dict) else None,
+                ),
             )
             if previous_presence_state != "unknown" and current_presence_state != "unknown":
                 state_changed_event = {
