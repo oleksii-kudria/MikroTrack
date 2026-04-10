@@ -165,7 +165,7 @@ def _idle_timeout_exceeded(*, previous: dict[str, Any], now: datetime) -> bool:
     if idle_since is None:
         return False
 
-    return (now - idle_since).total_seconds() > _idle_timeout_seconds
+    return (now - idle_since).total_seconds() >= _idle_timeout_seconds
 
 
 def _source_value(device: dict[str, Any]) -> str:
@@ -269,6 +269,23 @@ def _state_reason(state: str, arp_status: str, bridge_host_present: bool) -> str
     if state == "offline" and normalized in {"failed", "incomplete"}:
         return f"arp_{normalized}"
     return "no_evidence"
+
+
+def _device_offline_reason(
+    previous_state: str,
+    current_state: str,
+    arp_status: str,
+    bridge_host_present: bool,
+) -> str:
+    previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, current_state)
+    if (
+        previous_presence_state == "idle"
+        and current_presence_state == "offline"
+        and not bridge_host_present
+        and normalize_arp_status(arp_status) in {"permanent", "unknown", "stale", "delay", "probe"}
+    ):
+        return "idle_timeout"
+    return _state_reason(current_state, arp_status, bridge_host_present)
 
 
 def _normalized_device_state(state: str) -> str:
@@ -439,20 +456,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(device.get("bridge_host_present", False))
         bridge_host_lost = previous_bridge_host_present and not current_bridge_host_present
-        if bridge_host_lost:
-            merge_current_state = _recalculate_state_on_bridge_host_loss(device)
-            device["arp_state"] = merge_current_state
-            device["fused_state"] = merge_current_state
-            decision = "bridge_host_lost_recalculated_state"
-        elif current_state == "unknown" and _has_presence_evidence(device):
-            merge_current_state = previous_state
-            decision = "unknown_with_evidence_preserved_previous_state"
-        elif (
-            current_state == "idle"
-            and previous_state == "idle"
+        idle_timeout_should_force_offline = (
+            previous_state == "idle"
+            and current_state != "online"
+            and not current_bridge_host_present
             and isinstance(now_dt, datetime)
             and _idle_timeout_exceeded(previous=previous, now=now_dt)
-        ):
+        )
+
+        if idle_timeout_should_force_offline:
             merge_current_state = "offline"
             device["arp_state"] = "offline"
             device["fused_state"] = "offline"
@@ -461,6 +473,14 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 "Idle timeout exceeded for MAC %s, forcing state to offline",
                 mac,
             )
+        elif bridge_host_lost:
+            merge_current_state = _recalculate_state_on_bridge_host_loss(device)
+            device["arp_state"] = merge_current_state
+            device["fused_state"] = merge_current_state
+            decision = "bridge_host_lost_recalculated_state"
+        elif current_state == "unknown" and _has_presence_evidence(device):
+            merge_current_state = previous_state
+            decision = "unknown_with_evidence_preserved_previous_state"
         elif current_state == "idle" and previous_state == "offline":
             merge_current_state = "offline"
             device["arp_state"] = "offline"
@@ -924,7 +944,14 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             _log_event(event)
 
             if current_fused_state in {"online", "offline", "idle"}:
-                reason = _state_reason(current_fused_state, current_arp_status, current_bridge_host_present)
+                reason = _device_offline_reason(
+                    previous_fused_state,
+                    current_fused_state,
+                    current_arp_status,
+                    current_bridge_host_present,
+                )
+                if current_fused_state != "offline":
+                    reason = _state_reason(current_fused_state, current_arp_status, current_bridge_host_present)
                 device_event = {
                     "timestamp": _iso_timestamp(),
                     "event_type": f"device_{current_fused_state}",
