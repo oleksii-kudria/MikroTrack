@@ -223,6 +223,9 @@ def _resolve_api_state(
     idle_timeout_seconds: int,
     fallback_state: str,
 ) -> str:
+    if bridge_host_present:
+        return "online"
+
     if isinstance(offline_since, datetime):
         if fallback_state == "idle":
             logger.info("API state mapping: prevented idle override for MAC %s", mac)

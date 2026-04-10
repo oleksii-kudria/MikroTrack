@@ -292,7 +292,7 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["offline_since"])
         self.assertIsNone(item["idle_duration_seconds"])
 
-    def test_idle_timeout_not_applied_when_bridge_host_present(self) -> None:
+    def test_bridge_host_present_forces_online_even_with_idle_since(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["PERSISTENCE_PATH"] = tmp
             os.environ["IDLE_TIMEOUT_SECONDS"] = "60"
@@ -319,9 +319,9 @@ class ApiSessionTimingTests(unittest.TestCase):
             payload = list_devices()
             item = payload["items"][0]
 
-        self.assertEqual(item["status"], "idle")
-        self.assertEqual(item["flags"]["state"], "idle")
-        self.assertTrue(isinstance(item["idle_duration_seconds"], int))
+        self.assertEqual(item["status"], "online")
+        self.assertEqual(item["flags"]["state"], "online")
+        self.assertIsNone(item["idle_duration_seconds"])
 
 
 if __name__ == "__main__":
