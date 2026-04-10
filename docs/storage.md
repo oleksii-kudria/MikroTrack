@@ -124,7 +124,15 @@ INFO log example:
 
 ### Збереження подій
 
-Події записуються у `events.jsonl` в тій же директорії `PERSISTENCE_PATH`. Це підготовка до інтеграції web UI (таймлайн/історія змін).
+Перед записом у `events.jsonl` кожна подія проходить safe serialization:
+
+- `datetime` → `isoformat()`
+- `set` / `tuple` → `list`
+- `bytes` → UTF-8 string або `repr(...)`, якщо байти не декодуються
+- `dict` / `list` → рекурсивна нормалізація
+- інші нестандартні типи → `str(value)`
+
+Це гарантує, що diff не падає на несеріалізуємих Python-типах і `events.jsonl` стабільно створюється при наявності подій.
 
 ### Підсумок змін (INFO)
 
@@ -138,6 +146,10 @@ INFO log example:
 
 - `[DIFF_ERROR] Failed to process snapshots`
 - `Recommendation: Verify snapshot format and integrity`
+- Додатково пишеться stack trace з реальною причиною помилки (`logger.exception`)
+- Для помилок серіалізації подій логується:
+  - `Failed to serialize event event_type=... mac=...`
+  - `Event payload: {...}`
 
 ## Docker volume mapping
 
@@ -276,7 +288,15 @@ INFO log example:
 
 ### Event persistence
 
-Events are appended to `events.jsonl` in the same `PERSISTENCE_PATH` directory, preparing data for a web UI timeline/history view.
+Before writing to `events.jsonl`, every event goes through safe normalization:
+
+- `datetime` → `isoformat()`
+- `set` / `tuple` → `list`
+- `bytes` → UTF-8 string or `repr(...)` if decoding fails
+- `dict` / `list` → recursive normalization
+- other non-standard types → `str(value)`
+
+This prevents diff crashes caused by non-serializable Python values and keeps `events.jsonl` creation stable whenever events exist.
 
 ### Diff summary (INFO)
 
@@ -290,6 +310,10 @@ Diff error handling:
 
 - `[DIFF_ERROR] Failed to process snapshots`
 - `Recommendation: Verify snapshot format and integrity`
+- Additional traceback with root cause is logged via `logger.exception`
+- Event serialization failures log:
+  - `Failed to serialize event event_type=... mac=...`
+  - `Event payload: {...}`
 
 ## Docker volume mapping
 

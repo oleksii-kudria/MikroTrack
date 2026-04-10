@@ -16,6 +16,7 @@ _retention_days = 7
 _idle_timeout_seconds = 900
 _LOW_DISK_SPACE_THRESHOLD_BYTES = 50 * 1024 * 1024
 _EVENTS_FILENAME = "events.jsonl"
+_DATETIME_TYPE = datetime
 
 
 Event = dict[str, Any]
@@ -983,11 +984,42 @@ def _append_events(events: list[Event]) -> None:
         return
 
     events_path = _persistence_path / _EVENTS_FILENAME
+    persisted_count = 0
     with events_path.open("a", encoding="utf-8") as events_file:
         for event in events:
-            events_file.write(json.dumps(event, ensure_ascii=False) + "\n")
+            safe_event = _make_json_safe(event)
+            try:
+                events_file.write(json.dumps(safe_event, ensure_ascii=False) + "\n")
+                persisted_count += 1
+            except Exception:
+                event_type = str(event.get("event_type", "unknown"))
+                mac = str(event.get("mac", "unknown"))
+                logger.exception("Failed to serialize event event_type=%s mac=%s", event_type, mac)
+                logger.error("Event payload: %s", safe_event)
 
-    logger.info("Events persisted: %d -> %s", len(events), events_path)
+    if persisted_count:
+        logger.info("Events persisted: %d -> %s", persisted_count, events_path)
+    else:
+        logger.warning("No events were persisted after serialization attempts: %s", events_path)
+
+
+def _make_json_safe(value: Any) -> Any:
+    if isinstance(value, _DATETIME_TYPE):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _make_json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_make_json_safe(item) for item in value]
+    if isinstance(value, tuple | set):
+        return [_make_json_safe(item) for item in value]
+    if isinstance(value, bytes):
+        try:
+            return value.decode("utf-8")
+        except UnicodeDecodeError:
+            return repr(value)
+    if isinstance(value, str | int | float | bool) or value is None:
+        return value
+    return str(value)
 
 
 def _generate_diff_events(previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]) -> list[Event]:
@@ -1402,6 +1434,7 @@ def process_snapshot_diff(current_devices: list[dict[str, Any]]) -> list[Event]:
         _append_events(events)
         return events
     except Exception:
+        logger.exception("diff processing failed with traceback")
         logger.error("[DIFF_ERROR] Failed to process snapshots")
         logger.error("Recommendation: Verify snapshot format and integrity")
         return []
