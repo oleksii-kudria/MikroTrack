@@ -1239,7 +1239,7 @@
         if (leftEmpty && rightEmpty) {
           return 0;
         }
-        // Фіксоване правило: пусті значення завжди внизу незалежно від напряму.
+        // Fixed rule: empty values always stay at the bottom regardless of direction.
         if (leftEmpty) {
           return 1;
         }
@@ -1329,6 +1329,26 @@
         },
       };
 
+      const compareDefaultStatusOrdering = (left, right) => {
+        const leftStatus = normalizeStatus(left);
+        const rightStatus = normalizeStatus(right);
+        const leftPriority = statusGroupPriority[leftStatus] ?? 99;
+        const rightPriority = statusGroupPriority[rightStatus] ?? 99;
+        if (leftPriority !== rightPriority) {
+          return leftPriority - rightPriority;
+        }
+
+        if (leftStatus === "unknown" && rightStatus === "unknown") {
+          const leftName = normalizeText(left.hostname) || normalizeText(left.mac) || "";
+          const rightName = normalizeText(right.hostname) || normalizeText(right.mac) || "";
+          return leftName.localeCompare(rightName, undefined, { sensitivity: "base" });
+        }
+
+        const leftTs = readStateTimestampMs(left);
+        const rightTs = readStateTimestampMs(right);
+        return compareNullable(leftTs, rightTs, "desc", (a, b) => a - b);
+      };
+
       const compareBySortKey = (left, right, key, direction) => {
         if (!key || !direction) {
           return 0;
@@ -1380,15 +1400,11 @@
         return items
           .map((item, index) => ({ item, index }))
           .sort((leftWrapped, rightWrapped) => {
-            const leftStatus = normalizeStatus(leftWrapped.item);
-            const rightStatus = normalizeStatus(rightWrapped.item);
-            const leftGroupPriority = statusGroupPriority[leftStatus] ?? 99;
-            const rightGroupPriority = statusGroupPriority[rightStatus] ?? 99;
-            if (leftGroupPriority !== rightGroupPriority) {
-              return leftGroupPriority - rightGroupPriority;
-            }
-
             if (!activeDeviceSort) {
+              const comparedByDefault = compareDefaultStatusOrdering(leftWrapped.item, rightWrapped.item);
+              if (comparedByDefault !== 0) {
+                return comparedByDefault;
+              }
               return leftWrapped.index - rightWrapped.index;
             }
 
@@ -1416,19 +1432,32 @@
         return null;
       };
 
+      const logDevicesSorting = () => {
+        if (!activeDeviceSort) {
+          console.debug("Sorting applied: column=default_status mode=default");
+          return;
+        }
+        console.debug(
+          `Sorting applied: column=${activeDeviceSort.key} direction=${activeDeviceSort.direction} mode=explicit`,
+        );
+      };
+
       const applySortHeaderClick = (key) => {
         if (!activeDeviceSort || activeDeviceSort.key !== key) {
           activeDeviceSort = { key, direction: "asc" };
+          logDevicesSorting();
           return;
         }
 
         const nextDirection = cycleDirection(activeDeviceSort.direction);
         if (!nextDirection) {
           activeDeviceSort = null;
+          logDevicesSorting();
           return;
         }
 
         activeDeviceSort = { key, direction: nextDirection };
+        logDevicesSorting();
       };
 
       const updateDeviceSortIndicators = () => {
@@ -1637,6 +1666,7 @@
       devicesRefreshButton.addEventListener("click", loadDevices);
       devicesClearSortButton.addEventListener("click", () => {
         activeDeviceSort = null;
+        logDevicesSorting();
         renderDevicesView();
       });
       clearDeviceFiltersButton.addEventListener("click", () => {
