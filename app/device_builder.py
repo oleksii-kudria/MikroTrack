@@ -312,7 +312,8 @@ def build_devices(
         if _is_random_mac(device.get("mac_address", "")):
             badges.append("RANDOM")
         elif arp_status == "permanent":
-            badges.append("PERM")
+            badges.append("STATIC")
+            logger.info("ARP permanent entry is treated as STATIC metadata for MAC %s", str(device.get("mac_address", "")).strip().upper() or "unknown")
         if _is_link_local(str(device.get("ip_address", ""))):
             badges.append("LINK-LOCAL")
         if (
