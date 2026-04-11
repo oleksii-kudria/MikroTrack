@@ -2,7 +2,7 @@
 
 ## 🇺🇦 Українською
 
-Нижче наведені категорії помилок MikroTik API, які повертає MikroTrack:
+## MikroTik API error categories
 
 - `connection_error`
 - `tls_error`
@@ -13,105 +13,96 @@
 
 ### connection_error
 
-Симптоми:
+Перевірте:
 
-- неможливо підключитись до `MIKROTIK_HOST:MIKROTIK_PORT`
-- timeout / connection refused / network unreachable
-
-Перевірки:
-
-- на MikroTik увімкнено `api` або `api-ssl`
-- порт вказаний правильно (типово `8729` для `api-ssl`)
-- firewall дозволяє вхідне з'єднання з collector host
-- DNS/IP вказані коректно
+- доступність `MIKROTIK_HOST:MIKROTIK_PORT`
+- увімкнений `api`/`api-ssl`
+- firewall/ACL/DNS маршрутизацію
 
 ### tls_error
 
-Симптоми:
-
-- помилка TLS handshake
-- `certificate verify failed`
-- `wrong version number` або інші SSL/TLS помилки
-
-Перевірки:
+Перевірте:
 
 - `MIKROTIK_USE_SSL=true`
-- на MikroTik сертифікат призначений на `api-ssl`
-- для self-signed сертифіката: `MIKROTIK_SSL_VERIFY=false` або правильна довіра до CA
-- дата/час роутера коректні
+- сертифікат для `api-ssl`
+- `MIKROTIK_SSL_VERIFY` для self-signed сценарію
+- коректний час на роутері
 
 ### authentication_failed
 
-Симптоми:
+Перевірте:
 
-- логін відхилено
-- authentication error у логах
-
-Перевірки:
-
-- `MIKROTIK_USERNAME` та `MIKROTIK_PASSWORD` правильні
-- акаунт не вимкнено
-- користувач має мінімум права `read`, `api`
+- `MIKROTIK_USERNAME`, `MIKROTIK_PASSWORD`
+- політики користувача (`read`, `api`)
 
 ### access_denied
 
-Симптоми:
+Перевірте:
 
-- TCP з'єднання встановлюється, але API сесія не ініціалізується
-- помилка доступу або закриття сесії на етапі авторизації
+- allow-list в `/ip service api-ssl address`
+- політики user group
 
-Ймовірна причина:
+### api_protocol_error / unexpected_response
 
-- IP collector не входить у `/ip service api-ssl address`
-- користувачу бракує політик для API
+Перевірте:
 
-Виправлення:
+- сумісність RouterOS API
+- доступність endpoint-ів, які collector читає
 
-- перевірити allow-list для `api-ssl`
-- перевірити policy групи користувача (мінімум `read,api`)
+## Expected warnings (not real failures)
 
-### api_protocol_error
+Це очікувані стани; collector може працювати далі:
 
-Симптоми:
+- `Failed to fetch /interface/wireless entries: ... no such command prefix`
+  - Причина: на пристрої немає wireless package/resource.
+- `WARNING: Persistence path may not be mounted to host`
+  - Причина: path існує в контейнері, але host mount може бути неочевидним.
+- `persistence: skipping device without MAC key`
+  - Причина: legacy/invalid snapshot entry без `mac_address`/`mac`.
 
-- помилки протоколу RouterOS API
-- несподіване завершення API-комунікації
+## Real persistence issues
 
-Перевірки:
+Ознаки реальної проблеми:
 
-- сумісність версії RouterOS/API
-- стабільність каналу зв'язку
-- коректність налаштувань сервісу API
-
-### unexpected_response
-
-Симптоми:
-
-- API відповідає у форматі, який не очікує колектор
+- `[PERSISTENCE_ERROR] ...`
+- snapshot-и не з'являються в `PERSISTENCE_PATH`
+- `events.jsonl` не оновлюється при змінах у мережі
 
 Перевірки:
 
-- перевірити RouterOS версію та доступність потрібних API ресурсів
+- `PERSISTENCE_ENABLED=true`
+- `PERSISTENCE_PATH=/data/snapshots`
+- volume mapping: `./data/snapshots:/data/snapshots`
+- права запису на host директорію
+- вільне місце на диску
 
-### persistence errors
+## Operator-oriented quick verification
 
-Симптоми:
+```bash
+# app/web status
+docker compose ps
 
-- `[PERSISTENCE_ERROR]` у логах під час старту
-- snapshot-файли не створюються у `PERSISTENCE_PATH`
+# app health
+curl -s http://localhost:8000/health
 
-Перевірки:
+# snapshots present
+ls -lah ./data/snapshots/*.json | tail -n 5
 
-- директорія `PERSISTENCE_PATH` існує та доступна на запис
-- Docker volume змонтований: `- /data/snapshots:/data/snapshots`
-- на хості достатньо вільного місця (мінімум 50MB)
-- користувач контейнера має права на директорію
+# events stream alive
+tail -n 20 ./data/snapshots/events.jsonl
+
+# diff/errors logs
+docker compose logs mikrotrack-app --tail=200 | rg "Diff summary|DIFF_|PERSISTENCE_ERROR|Events persisted"
+
+# mounted path check
+docker compose config | rg "snapshots"
+```
 
 ---
 
 ## 🇬🇧 English
 
-Below are the MikroTik API error categories returned by MikroTrack:
+## MikroTik API error categories
 
 - `connection_error`
 - `tls_error`
@@ -122,96 +113,87 @@ Below are the MikroTik API error categories returned by MikroTrack:
 
 ### connection_error
 
-Symptoms:
+Check:
 
-- cannot connect to `MIKROTIK_HOST:MIKROTIK_PORT`
-- timeout / connection refused / network unreachable
-
-Checks:
-
-- MikroTik `api` or `api-ssl` service is enabled
-- port is correct (default `8729` for `api-ssl`)
-- firewall allows inbound connection from collector host
-- DNS/IP configuration is correct
+- reachability of `MIKROTIK_HOST:MIKROTIK_PORT`
+- `api`/`api-ssl` service state
+- firewall/ACL/DNS routing
 
 ### tls_error
 
-Symptoms:
-
-- TLS handshake failure
-- `certificate verify failed`
-- `wrong version number` or other SSL/TLS failures
-
-Checks:
+Check:
 
 - `MIKROTIK_USE_SSL=true`
-- MikroTik has certificate assigned to `api-ssl`
-- if using self-signed certificate, set `MIKROTIK_SSL_VERIFY=false` or trust CA properly
-- router date/time are correct (important for certificate validation)
+- certificate assignment for `api-ssl`
+- `MIKROTIK_SSL_VERIFY` for self-signed setup
+- router time correctness
 
 ### authentication_failed
 
-Symptoms:
+Check:
 
-- login rejected
-- authentication error in logs
-
-Checks:
-
-- `MIKROTIK_USERNAME` and `MIKROTIK_PASSWORD` are correct
-- account is not disabled
-- user has enough policy rights (`read`, `api`)
+- `MIKROTIK_USERNAME`, `MIKROTIK_PASSWORD`
+- user policy rights (`read`, `api`)
 
 ### access_denied
 
-Symptoms:
+Check:
 
-- TCP connection is established, but API session is not initialized
-- access is denied or session closes during authorization
+- `/ip service api-ssl address` allow-list
+- user group policies
 
-Likely causes:
+### api_protocol_error / unexpected_response
 
-- collector IP is not included in `/ip service api-ssl address`
-- user does not have enough API policies
+Check:
 
-Fix:
+- RouterOS API compatibility
+- availability of collector-read resources
 
-- verify `api-ssl` allow-list includes collector IP
-- verify user group policies include at least `read,api`
+## Expected warnings (not real failures)
 
-### api_protocol_error
+These are expected conditions; collector can continue:
 
-Symptoms:
+- `Failed to fetch /interface/wireless entries: ... no such command prefix`
+  - Cause: wireless resource/package is unavailable on this device.
+- `WARNING: Persistence path may not be mounted to host`
+  - Cause: container path exists, but host mount may be missing/misconfigured.
+- `persistence: skipping device without MAC key`
+  - Cause: legacy/invalid snapshot item without `mac_address`/`mac`.
 
-- RouterOS API protocol errors
-- unexpected API communication interruption
+## Real persistence issues
 
-Checks:
+Symptoms of actual problems:
 
-- RouterOS/API version compatibility
-- network stability
-- API service configuration correctness
-
-### unexpected_response
-
-Symptoms:
-
-- API responds with a format that collector does not expect
+- `[PERSISTENCE_ERROR] ...`
+- snapshots are not created under `PERSISTENCE_PATH`
+- `events.jsonl` is not updated while state changes happen
 
 Checks:
 
-- verify RouterOS version and required API resources
+- `PERSISTENCE_ENABLED=true`
+- `PERSISTENCE_PATH=/data/snapshots`
+- volume mapping: `./data/snapshots:/data/snapshots`
+- host directory write permissions
+- available free disk space
 
-### persistence errors
+## Operator-oriented quick verification
 
-Symptoms:
+```bash
+# app/web status
+docker compose ps
 
-- `[PERSISTENCE_ERROR]` in startup logs
-- snapshots are not created in `PERSISTENCE_PATH`
+# app health
+curl -s http://localhost:8000/health
 
-Checks:
+# snapshots present
+ls -lah ./data/snapshots/*.json | tail -n 5
 
-- `PERSISTENCE_PATH` exists and is writable
-- Docker volume is mapped: `- /data/snapshots:/data/snapshots`
-- host has enough free space (at least 50MB)
-- container user has directory permissions
+# events stream alive
+tail -n 20 ./data/snapshots/events.jsonl
+
+# diff/errors logs
+docker compose logs mikrotrack-app --tail=200 | rg "Diff summary|DIFF_|PERSISTENCE_ERROR|Events persisted"
+
+# mounted path check
+docker compose config | rg "snapshots"
+```

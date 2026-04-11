@@ -2,348 +2,364 @@
 
 ## 🇺🇦 Українською
 
-MikroTrack — це lightweight collector для моніторингу мережі на MikroTik.
+MikroTrack — lightweight collector + API + Web UI для моніторингу мережі MikroTik без окремої БД.
 
-Збирає:
-- DHCP leases
-- ARP table
+### Що реально збирає collector
 
-Формує:
-- єдину модель пристрою (unified device model)
+- DHCP leases (`/ip/dhcp-server/lease`)
+- ARP table (`/ip/arp`)
+- Bridge host table (`/interface/bridge/host`)
+- Interface MAC inventory (`/interface`, `/interface/bridge`, `/interface/vlan`)
+- Optional: `/interface/wireless` (якщо недоступний на конкретному RouterOS/device, collector логує warning і продовжує роботу)
 
-### Архітектура (коротко)
+### Architecture (current runtime)
 
-- collector + API (app container)
-- persistence через JSON snapshots + events.jsonl
-- web UI (окремий web container)
-- без окремої БД
+- `mikrotrack-app`: collector + persistence + FastAPI (`/api/v1/*`, `/api/devices`, `/health`)
+- `mikrotrack-web`: FastAPI + HTML UI (`/`, `/health`, проксі до backend API)
+- persistence: JSON snapshots + `events.jsonl` у `PERSISTENCE_PATH`
+- без зовнішньої БД
 
-### Quick Start
+### Quick Start (recommended deployment)
 
 ```bash
 git clone <repo-url>
 cd MikroTrack
 cp .env.example .env
+mkdir -p ./data/snapshots
 docker compose up --build
 ```
 
-### Основні параметри
+### Deployment path and volume mapping (canonical)
 
-- `LOG_LEVEL`
-- `RUN_MODE`
+Canonical runtime mapping:
+
+- host path: `./data/snapshots`
+- container path: `/data/snapshots`
+- env: `PERSISTENCE_PATH=/data/snapshots`
+
+`docker-compose.yml`:
+
+```yaml
+services:
+  mikrotrack-app:
+    volumes:
+      - ./data/snapshots:/data/snapshots
+```
+
+### Key parameters
+
+- `RUN_MODE` (`once` / `loop`)
 - `COLLECTION_INTERVAL`
-- `PRINT_RESULT_TO_STDOUT`
 - `PERSISTENCE_ENABLED`
 - `PERSISTENCE_PATH`
 - `PERSISTENCE_RETENTION_DAYS`
 - `IDLE_TIMEOUT_SECONDS`
-- `API_ENABLED`
-- `API_HOST` / `API_PORT`
-- `WEB_HOST` / `WEB_PORT`
-- `BACKEND_API_URL`
+- `API_ENABLED`, `API_HOST`, `API_PORT`
+- `WEB_HOST`, `WEB_PORT`, `BACKEND_API_URL`
+- `LOG_LEVEL`, `PRINT_RESULT_TO_STDOUT`
 
-### Persistence
+### State model and time fields
 
-Snapshot-файли зберігаються у директорії `PERSISTENCE_PATH`.
+Core states:
 
-- Формат імені: `YYYY-MM-DDTHH-MM-SS.json`
-- Збереження вмикається через `PERSISTENCE_ENABLED=true`
-- Автоматично створюється директорія, якщо її ще немає
-- На старті виконується перевірка шляху, прав запису та вільного місця
-- Старі файли видаляються за політикою `PERSISTENCE_RETENTION_DAYS`
+- `online`
+- `idle`
+- `offline`
+- `unknown`
 
-Приклад:
+Time fields:
 
-```env
-PERSISTENCE_ENABLED=true
-PERSISTENCE_PATH=/data/snapshots
-PERSISTENCE_RETENTION_DAYS=7
-IDLE_TIMEOUT_SECONDS=900
+- `state_changed_at`: остання зміна стану
+- `online_since`: початок поточної online-сесії
+- `idle_since`: момент переходу в idle (в межах online-сесії)
+- `offline_since`: початок offline-сесії
+
+Behavior:
+
+- `online ↔ idle`: оновлюється `state_changed_at`, `online_since` зберігається
+- `online/idle → offline`: `offline_since` встановлюється, online timestamps очищаються
+- `offline → online|idle`: стартує нова online-сесія (`online_since = now`, `offline_since = null`)
+- `unknown`: time fields можуть бути `null`
+- за відсутності explicit sorting UI використовує default state order: `online → idle → offline → unknown`
+
+### Snapshot schema (practical)
+
+Stable identity/core fields:
+
+- `mac_address` (primary key)
+- `ip_address`, `host_name`
+- `source`, `entity_type`, `interface_name`, `badges`
+
+State/session fields:
+
+- `arp_status`, `arp_state`, `fused_state`
+- `state_changed_at`, `online_since`, `idle_since`, `offline_since`
+
+Derived/calculated fields (можуть змінюватися між poll-ами):
+
+- `evidence`, `has_dhcp_lease`, `has_arp_entry`
+- `dhcp_flags`, `arp_flags`
+- stale identity fields: `last_known_ip`, `last_known_hostname`, `ip_is_stale`, `hostname_is_stale`, `data_is_stale`
+
+Поля, які часто можуть бути порожні (`""` або `null`):
+
+- `host_name`, `dhcp_comment`, `arp_comment`, `bridge_host_last_seen`, `idle_since`
+
+Minimal snapshot device example:
+
+```json
+{
+  "mac_address": "AA:BB:CC:DD:EE:FF",
+  "ip_address": "192.168.88.10",
+  "host_name": "workstation-01",
+  "source": ["dhcp", "arp"],
+  "arp_status": "reachable",
+  "fused_state": "online",
+  "state_changed_at": "2026-04-11T10:00:00+00:00",
+  "online_since": "2026-04-11T10:00:00+00:00",
+  "idle_since": null,
+  "offline_since": null
+}
 ```
 
-### Event-driven diff
+### Event schema (`events.jsonl`)
 
-Після кожного нового snapshot (починаючи з другого файлу) застосунок виконує event-driven diff з попереднім snapshot за MAC-ключем з fallback:
+Події, які реально пишуться:
 
-- `mac_address` (пріоритет)
-- `mac` (fallback)
+- presence/identity: `NEW_DEVICE`, `DEVICE_REMOVED`, `IP_CHANGED`, `HOSTNAME_CHANGED`
+- generic diff: `FIELD_CHANGE`
+- dhcp/arp/source: `DHCP_*`, `ARP_*`, `SOURCE_CHANGED`, `DEVICE_IP_ASSIGNMENT_CHANGED`
+- state/session: `arp_state_changed`, `state_changed`, `device_online`, `device_idle`, `device_offline`, `session_started`, `session_ended`
 
-Якщо обох ключів немає, запис пропускається з warning логом:
+Minimal examples:
 
-- `WARNING persistence: skipping device without MAC key`
+```json
+{"timestamp":"2026-04-11T10:02:00+00:00","event_type":"FIELD_CHANGE","mac":"AA:BB:CC:DD:EE:FF","device_mac":"AA:BB:CC:DD:EE:FF","field_name":"ip_address","previous_value":"192.168.88.10","current_value":"192.168.88.11"}
+{"timestamp":"2026-04-11T10:03:00+00:00","event_type":"state_changed","mac":"AA:BB:CC:DD:EE:FF","old_state":"online","new_state":"idle"}
+{"timestamp":"2026-04-11T10:15:00+00:00","event_type":"device_offline","mac":"AA:BB:CC:DD:EE:FF","reason":"idle_timeout"}
+```
 
-Це виправляє кейс, коли `events.jsonl` не створювався для snapshot-ів, що містили лише `mac`.
+### Expected warnings vs real errors
 
-Уся внутрішня datetime-логіка diff нормалізується до timezone-aware UTC:
+Expected warnings (collector продовжує роботу):
 
-- legacy snapshot-и без timezone (наприклад, `2026-04-10T19:41:29`) підтримуються та трактуються як UTC
-- значення із `Z` та `+00:00` також підтримуються
-- нові timestamps (`state_changed_at`, `online_since`, `idle_since`, `offline_since`, event `timestamp`) записуються у єдиному форматі з offset, наприклад `2026-04-10T19:47:01+00:00`
+- `Failed to fetch /interface/wireless entries: no such command prefix`
+- `WARNING: Persistence path may not be mounted to host`
+- `persistence: skipping device without MAC key`
 
-Логи (DEBUG) містять події:
+Real errors (потребують втручання):
 
-- presence: `NEW_DEVICE`, `DEVICE_REMOVED`
-- extended diff: `FIELD_CHANGE` (`state`, `ip_address`, `hostname`, `dhcp_lease_type`, `dhcp_presence`, `dhcp_flags`, `arp_flags`, `dhcp_comment`, `arp_comment`, `source`)
-- identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
-- DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
-- ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
-- source: `SOURCE_CHANGED`
-- combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
+- `[PERSISTENCE_ERROR] ...`
+- MikroTik connection/auth/TLS/protocol errors
+- repeated snapshot write failures
 
-Кожна подія перед записом у `events.jsonl` проходить safe serialization у `PERSISTENCE_PATH` (готовність для web UI):
+### Operator verification (quick checks)
 
-- `datetime` → ISO-8601 string через `isoformat()`
-- `set` / `tuple` → `list`
-- `bytes` → UTF-8 string (або `repr(...)`, якщо декодування неможливе)
-- `dict` / `list` → рекурсивна нормалізація
-- інші нестандартні типи → `str(value)`
+```bash
+# 1) snapshots exist
+ls -lah ./data/snapshots/*.json | tail -n 5
 
-Якщо конкретна подія не серіалізується навіть після нормалізації, diff не падає: у логи записуються `event_type`, `mac`, payload та stack trace (`logger.exception`), а інші події продовжують зберігатися.
+# 2) events.jsonl is written
+tail -n 20 ./data/snapshots/events.jsonl
 
-`FIELD_CHANGE` подія містить: `device_mac`, `field_name`, `previous_value`, `current_value`, `timestamp`.
+# 3) latest API snapshot
+curl -s http://localhost:8000/api/v1/snapshots/latest | jq '.filename'
 
-У логах INFO є summary:
+# 4) latest diff-related logs
+docker compose logs mikrotrack-app --tail=200 | rg "Diff summary|DIFF_|Events persisted"
 
-- `new`
-- `removed`
-- `changed`
-- `events`
+# 5) verify volume mapping
+docker compose config | rg "snapshots"
+```
 
-### Last known IP/hostname for offline devices (DHCP expiration)
+### Documentation
 
-When a device goes `offline` and DHCP lease later disappears, MikroTrack keeps the latest known identity fields:
-
-- `ip_address`
-- `host_name`
-
-Snapshot enrichment also stores:
-
-- `last_known_ip`
-- `last_known_hostname`
-- stale flags (`ip_is_stale`, `hostname_is_stale`, `data_is_stale`)
-
-In Web UI, stale values are rendered with a muted style and `STALE` badge/tooltip so operators understand this is last known data.
-
-### Web UI: toolbar, filters, mode, summary
-
-У вкладці Devices toolbar працює як єдина система:
-
-- Layout побудовано у логічному потоці: `Filters → Mode → Summary → Actions`.
-- Active filters відображаються як **ті самі badge-компоненти**, що й у таблиці (без окремих стилів).
-- Active filters клікабельні (hover/pointer/active) і підтримують очищення як через `Clear ✕`, так і прямим кліком по badge.
-- `Mode` має 2 стани:
-  - `End` (за замовчуванням): приховує `BRIDGE`, `COMPLETE`, `INTERFACE` та пристрої зі статусом `unknown`.
-  - `All`: показує всі записи.
-- `Devices: X | ...` summary рахується **тільки з dataset поточного mode** (End/All), але **не залежить від filters**.
-
-Порядок обробки:
-
-1. Завантажується повний набір даних
-2. Застосовується display mode (`End` / `All`)
-3. Рахується summary для dataset поточного mode
-4. Застосовуються активні filters (status/assignment) для таблиці
-5. Застосовується сортування
-6. Відбувається рендер таблиці
-
-Кольори статусів уніфіковані між status dot, badge та summary.
-
-### Web UI: сортування таблиці Devices
-
-- Підтримується тільки **single-column sorting**.
-- Стан сортування для кожного заголовка: `none → asc → desc`.
-- Якщо користувач обрав стовпчик, застосовується лише це explicit sorting (без multi-column chaining).
-- Якщо explicit sorting не обрано, використовується default порядок:
-  1. `online`
-  2. `idle`
-  3. `offline`
-  4. `unknown`
-- Усередині статусних груп:
-  - `online` → `online_since`
-  - `idle` → `idle_since`
-  - `offline` → `offline_since`
-  - `unknown` → тільки алфавітне сортування (без date fallback)
-- Для `unknown` і для порожніх значень діє стабільна deterministic поведінка без прихованих режимів.
-
-### Документація
-
-- MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
-- Device model → [`docs/device-model.md`](docs/device-model.md)
-- Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
-- Storage → [`docs/storage.md`](docs/storage.md)
-- Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
+- Device model → [`docs/device-model.md`](docs/device-model.md)
+- Storage/persistence → [`docs/storage.md`](docs/storage.md)
+- Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
+- Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
+- MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
 
 ---
 
 ## 🇬🇧 English
 
-MikroTrack is a lightweight network monitoring collector for MikroTik.
+MikroTrack is a lightweight collector + API + Web UI for MikroTik network monitoring, with no external database.
 
-Collects:
-- DHCP leases
-- ARP table
+### What the collector actually uses
 
-Builds:
-- unified device model
+- DHCP leases (`/ip/dhcp-server/lease`)
+- ARP table (`/ip/arp`)
+- Bridge host table (`/interface/bridge/host`)
+- Interface MAC inventory (`/interface`, `/interface/bridge`, `/interface/vlan`)
+- Optional: `/interface/wireless` (if unavailable on a specific RouterOS/device, collector logs a warning and continues)
 
-### Architecture (short)
+### Architecture (current runtime)
 
-- collector + API (app container)
-- JSON snapshot + events.jsonl persistence
-- web UI (separate web container)
+- `mikrotrack-app`: collector + persistence + FastAPI (`/api/v1/*`, `/api/devices`, `/health`)
+- `mikrotrack-web`: FastAPI + HTML UI (`/`, `/health`, backend API proxy)
+- persistence: JSON snapshots + `events.jsonl` under `PERSISTENCE_PATH`
 - no dedicated DB
 
-### Quick Start
+### Quick Start (recommended deployment)
 
 ```bash
 git clone <repo-url>
 cd MikroTrack
 cp .env.example .env
+mkdir -p ./data/snapshots
 docker compose up --build
+```
+
+### Deployment path and volume mapping (canonical)
+
+Canonical runtime mapping:
+
+- host path: `./data/snapshots`
+- container path: `/data/snapshots`
+- env: `PERSISTENCE_PATH=/data/snapshots`
+
+`docker-compose.yml`:
+
+```yaml
+services:
+  mikrotrack-app:
+    volumes:
+      - ./data/snapshots:/data/snapshots
 ```
 
 ### Key parameters
 
-- `LOG_LEVEL`
-- `RUN_MODE`
+- `RUN_MODE` (`once` / `loop`)
 - `COLLECTION_INTERVAL`
-- `PRINT_RESULT_TO_STDOUT`
 - `PERSISTENCE_ENABLED`
 - `PERSISTENCE_PATH`
 - `PERSISTENCE_RETENTION_DAYS`
 - `IDLE_TIMEOUT_SECONDS`
-- `API_ENABLED`
-- `API_HOST` / `API_PORT`
-- `WEB_HOST` / `WEB_PORT`
-- `BACKEND_API_URL`
+- `API_ENABLED`, `API_HOST`, `API_PORT`
+- `WEB_HOST`, `WEB_PORT`, `BACKEND_API_URL`
+- `LOG_LEVEL`, `PRINT_RESULT_TO_STDOUT`
 
-### Persistence
+### State model and time fields
 
-Snapshot files are stored in `PERSISTENCE_PATH`.
+Core states:
 
-- File name format: `YYYY-MM-DDTHH-MM-SS.json`
-- Enable via `PERSISTENCE_ENABLED=true`
-- Directory is created automatically if missing
-- On startup, path, write permissions, and free disk space are validated
-- Old files are removed using `PERSISTENCE_RETENTION_DAYS`
+- `online`
+- `idle`
+- `offline`
+- `unknown`
 
-Example:
+Time fields:
 
-```env
-PERSISTENCE_ENABLED=true
-PERSISTENCE_PATH=/data/snapshots
-PERSISTENCE_RETENTION_DAYS=7
-IDLE_TIMEOUT_SECONDS=900
+- `state_changed_at`: latest state transition timestamp
+- `online_since`: current online-session start
+- `idle_since`: idle transition timestamp (inside online session)
+- `offline_since`: current offline-session start
+
+Behavior:
+
+- `online ↔ idle`: updates `state_changed_at`, keeps `online_since`
+- `online/idle → offline`: sets `offline_since`, clears online timestamps
+- `offline → online|idle`: starts a new online session (`online_since = now`, `offline_since = null`)
+- `unknown`: time fields may be `null`
+- without explicit sorting, UI default state order is `online → idle → offline → unknown`
+
+### Snapshot schema (practical)
+
+Stable identity/core fields:
+
+- `mac_address` (primary key)
+- `ip_address`, `host_name`
+- `source`, `entity_type`, `interface_name`, `badges`
+
+State/session fields:
+
+- `arp_status`, `arp_state`, `fused_state`
+- `state_changed_at`, `online_since`, `idle_since`, `offline_since`
+
+Derived/calculated fields (can change between polls):
+
+- `evidence`, `has_dhcp_lease`, `has_arp_entry`
+- `dhcp_flags`, `arp_flags`
+- stale identity fields: `last_known_ip`, `last_known_hostname`, `ip_is_stale`, `hostname_is_stale`, `data_is_stale`
+
+Fields that may be empty (`""` or `null`):
+
+- `host_name`, `dhcp_comment`, `arp_comment`, `bridge_host_last_seen`, `idle_since`
+
+Minimal snapshot device example:
+
+```json
+{
+  "mac_address": "AA:BB:CC:DD:EE:FF",
+  "ip_address": "192.168.88.10",
+  "host_name": "workstation-01",
+  "source": ["dhcp", "arp"],
+  "arp_status": "reachable",
+  "fused_state": "online",
+  "state_changed_at": "2026-04-11T10:00:00+00:00",
+  "online_since": "2026-04-11T10:00:00+00:00",
+  "idle_since": null,
+  "offline_since": null
+}
 ```
 
-### Event-driven diff
+### Event schema (`events.jsonl`)
 
-After each new snapshot (starting from the second file), the app computes an event-driven diff against the previous snapshot using MAC key fallback:
+Events that are actually persisted:
 
-- `mac_address` (priority)
-- `mac` (fallback)
+- presence/identity: `NEW_DEVICE`, `DEVICE_REMOVED`, `IP_CHANGED`, `HOSTNAME_CHANGED`
+- generic diff: `FIELD_CHANGE`
+- dhcp/arp/source: `DHCP_*`, `ARP_*`, `SOURCE_CHANGED`, `DEVICE_IP_ASSIGNMENT_CHANGED`
+- state/session: `arp_state_changed`, `state_changed`, `device_online`, `device_idle`, `device_offline`, `session_started`, `session_ended`
 
-If both keys are missing, the record is skipped with a warning log:
+Minimal examples:
 
-- `WARNING persistence: skipping device without MAC key`
+```json
+{"timestamp":"2026-04-11T10:02:00+00:00","event_type":"FIELD_CHANGE","mac":"AA:BB:CC:DD:EE:FF","device_mac":"AA:BB:CC:DD:EE:FF","field_name":"ip_address","previous_value":"192.168.88.10","current_value":"192.168.88.11"}
+{"timestamp":"2026-04-11T10:03:00+00:00","event_type":"state_changed","mac":"AA:BB:CC:DD:EE:FF","old_state":"online","new_state":"idle"}
+{"timestamp":"2026-04-11T10:15:00+00:00","event_type":"device_offline","mac":"AA:BB:CC:DD:EE:FF","reason":"idle_timeout"}
+```
 
-This fixes the case where `events.jsonl` was not created for snapshots containing only `mac`.
+### Expected warnings vs real errors
 
-All internal diff datetimes are normalized to timezone-aware UTC values:
+Expected warnings (collector continues):
 
-- legacy snapshots without timezone (for example, `2026-04-10T19:41:29`) are still supported and interpreted as UTC
-- `Z` and `+00:00` timestamps are both supported
-- new timestamps (`state_changed_at`, `online_since`, `idle_since`, `offline_since`, event `timestamp`) are persisted in one offset-aware format, for example `2026-04-10T19:47:01+00:00`
+- `Failed to fetch /interface/wireless entries: no such command prefix`
+- `WARNING: Persistence path may not be mounted to host`
+- `persistence: skipping device without MAC key`
 
-DEBUG logs include events:
+Real errors (require operator action):
 
-- presence: `NEW_DEVICE`, `DEVICE_REMOVED`
-- extended diff: `FIELD_CHANGE` (`state`, `ip_address`, `hostname`, `dhcp_lease_type`, `dhcp_presence`, `dhcp_flags`, `arp_flags`, `dhcp_comment`, `arp_comment`, `source`)
-- identity: `IP_CHANGED`, `HOSTNAME_CHANGED`
-- DHCP: `DHCP_ADDED`, `DHCP_REMOVED`, `DHCP_DYNAMIC_CHANGED`, `DHCP_STATUS_CHANGED`, `DHCP_COMMENT_CHANGED`
-- ARP: `ARP_ADDED`, `ARP_REMOVED`, `ARP_DYNAMIC_CHANGED`, `ARP_FLAG_CHANGED`
-- source: `SOURCE_CHANGED`
-- combined: `DEVICE_IP_ASSIGNMENT_CHANGED`
+- `[PERSISTENCE_ERROR] ...`
+- MikroTik connection/auth/TLS/protocol errors
+- repeated snapshot write failures
 
-Each event is safely normalized before JSONL persistence to `events.jsonl` under `PERSISTENCE_PATH` (ready for web UI integration):
+### Operator verification (quick checks)
 
-- `datetime` → ISO-8601 string via `isoformat()`
-- `set` / `tuple` → `list`
-- `bytes` → UTF-8 string (or `repr(...)` when decoding fails)
-- `dict` / `list` → recursive normalization
-- other non-standard Python types → `str(value)`
+```bash
+# 1) snapshots exist
+ls -lah ./data/snapshots/*.json | tail -n 5
 
-If a specific event still cannot be serialized after normalization, diff does not crash: logs include `event_type`, `mac`, payload preview, and full stack trace (`logger.exception`), while other events continue to persist.
+# 2) events.jsonl is written
+tail -n 20 ./data/snapshots/events.jsonl
 
-`FIELD_CHANGE` events contain: `device_mac`, `field_name`, `previous_value`, `current_value`, `timestamp`.
+# 3) latest API snapshot
+curl -s http://localhost:8000/api/v1/snapshots/latest | jq '.filename'
 
-INFO logs include a summary with:
+# 4) latest diff-related logs
+docker compose logs mikrotrack-app --tail=200 | rg "Diff summary|DIFF_|Events persisted"
 
-- `new`
-- `removed`
-- `changed`
-- `events`
-
-### Last known IP/hostname for offline devices (DHCP expiration)
-
-When a device becomes `offline` and its DHCP lease is later removed, MikroTrack preserves the latest known identity fields:
-
-- `ip_address`
-- `host_name`
-
-Snapshot enrichment also keeps:
-
-- `last_known_ip`
-- `last_known_hostname`
-- stale flags (`ip_is_stale`, `hostname_is_stale`, `data_is_stale`)
-
-In Web UI, stale values are displayed with muted styling and a `STALE` badge/tooltip to make it explicit that these are last known values.
-
-### Web UI: toolbar, filters, mode, summary
-
-In the Devices tab, the toolbar behaves as one coherent system:
-
-- The layout follows a logical flow: `Filters → Mode → Summary → Actions`.
-- Active filters use the **same badge component** as table badges (no separate filter-only styling).
-- Active filters are clickable (hover/pointer/active) and can be cleared via `Clear ✕` or by clicking a filter badge directly.
-- `Mode` has 2 states:
-  - `End` (default): hides `BRIDGE`, `COMPLETE`, `INTERFACE`, and `unknown` status devices.
-  - `All`: shows all records.
-- `Devices: X | ...` summary is calculated **only from the current mode dataset** (End/All) and **does not depend on filters**.
-
-Processing order:
-
-1. Full dataset is loaded
-2. Display mode (`End` / `All`) is applied
-3. Summary is recalculated for the current mode dataset
-4. Active filters (status/assignment) are applied to table rows
-5. Sorting is applied
-6. Rows are rendered
-
-Status colors are unified across status dots, badges, and summary.
-
-### Web UI: Devices table sorting
-
-- Only **single-column sorting** is supported.
-- Header click state is `none → asc → desc`.
-- When a user picks a column, only that explicit sort is applied (no multi-column chaining).
-- When no explicit sort is selected, default ordering is used:
-  1. `online`
-  2. `idle`
-  3. `offline`
-  4. `unknown`
-- Within status groups:
-  - `online` → `online_since`
-  - `idle` → `idle_since`
-  - `offline` → `offline_since`
-  - `unknown` → alphabetical only (no date fallback)
-- `unknown` and empty values use stable deterministic behavior with no hidden sort modes.
+# 5) verify volume mapping
+docker compose config | rg "snapshots"
+```
 
 ### Documentation
 
-- MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
-- Device model → [`docs/device-model.md`](docs/device-model.md)
-- Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
-- Storage → [`docs/storage.md`](docs/storage.md)
-- Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
+- Device model → [`docs/device-model.md`](docs/device-model.md)
+- Storage/persistence → [`docs/storage.md`](docs/storage.md)
+- Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
+- Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
+- MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)

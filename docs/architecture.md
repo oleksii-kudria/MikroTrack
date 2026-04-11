@@ -2,78 +2,68 @@
 
 ## 🇺🇦 Українською
 
-## Поточний стан: Collector + JSON persistence
+## Поточна runtime-архітектура (Phase 1 baseline)
 
-MikroTrack зараз працює як **collector-сервіс** із JSON snapshots.
+MikroTrack уже має production-usable runtime без окремої БД:
 
-Відповідальність:
+- **mikrotrack-app container**
+  - collector loop/once
+  - RouterOS API integration
+  - snapshot persistence (`*.json`)
+  - event diff + `events.jsonl`
+  - FastAPI endpoints: `/health`, `/api/v1/snapshots`, `/api/v1/snapshots/latest`, `/api/v1/events`, `/api/devices`
+- **mikrotrack-web container**
+  - FastAPI + template UI
+  - timeline/events view
+  - devices table UI (filters/mode/sorting/live timers)
+  - backend proxy to `/api/devices`
 
-- підключення до MikroTik через RouterOS API (SSL)
-- збір DHCP leases, ARP entries та Bridge Host entries
-- нормалізація і обʼєднання у unified device model
-- вивід результату у логи/stdout
-- збереження snapshot у JSON (за потреби)
+## Data flow
 
-## Майбутнє: Storage
+1. Collector reads DHCP + ARP + bridge host + interface MAC sources.
+2. Device builder merges data into unified device model keyed by MAC.
+3. Persistence layer enriches stable timestamps and stale identity fields.
+4. New snapshot is written into `PERSISTENCE_PATH`.
+5. Diff vs previous snapshot generates events into `events.jsonl`.
+6. API serves latest state; Web UI renders timeline and devices table.
 
-Наступний етап storage шару:
+## Storage model
 
-- snapshots + diff
-- optional relational DB
-- retention та історія змін
-
-## Майбутнє: API
-
-Планований API шар:
-
-- доступ до останнього snapshot
-- query/filter для пристроїв
-- health/status endpoint
-
-## Майбутнє: UI
-
-Планований UI шар:
-
-- dashboard для мережевої видимості
-- searchable table пристроїв
-- статуси та troubleshooting hints
+- snapshots: one JSON file per cycle
+- events: append-only `events.jsonl`
+- retention: `PERSISTENCE_RETENTION_DAYS`
 
 ---
 
 ## 🇬🇧 English
 
-## Current: Collector + JSON persistence
+## Current runtime architecture (Phase 1 baseline)
 
-MikroTrack currently runs as a **collector service** with JSON snapshots.
+MikroTrack already provides a production-usable runtime without a dedicated DB:
 
-Responsibilities:
+- **mikrotrack-app container**
+  - collector loop/once
+  - RouterOS API integration
+  - snapshot persistence (`*.json`)
+  - event diff + `events.jsonl`
+  - FastAPI endpoints: `/health`, `/api/v1/snapshots`, `/api/v1/snapshots/latest`, `/api/v1/events`, `/api/devices`
+- **mikrotrack-web container**
+  - FastAPI + template UI
+  - timeline/events view
+  - devices table UI (filters/mode/sorting/live timers)
+  - backend proxy to `/api/devices`
 
-- connect to MikroTik via RouterOS API (SSL)
-- collect DHCP leases, ARP entries, and Bridge Host entries
-- normalize and merge data into a unified device model
-- output data to logs/stdout
-- persist snapshots to JSON (optional)
+## Data flow
 
-## Future: Storage
+1. Collector reads DHCP + ARP + bridge host + interface MAC sources.
+2. Device builder merges data into a unified MAC-keyed model.
+3. Persistence enriches stable timestamps and stale identity fields.
+4. A new snapshot is written to `PERSISTENCE_PATH`.
+5. Diff vs previous snapshot appends events into `events.jsonl`.
+6. API serves current state; Web UI renders timeline and devices table.
 
-Next storage layer direction:
+## Storage model
 
-- snapshots + diff
-- optional relational DB
-- retention and history policies
-
-## Future: API
-
-Planned API layer:
-
-- access latest snapshot
-- query/filter devices
-- health/status endpoint
-
-## Future: UI
-
-Planned UI layer:
-
-- dashboard for device visibility
-- searchable device table
-- status indicators and troubleshooting hints
+- snapshots: one JSON file per cycle
+- events: append-only `events.jsonl`
+- retention: `PERSISTENCE_RETENTION_DAYS`
