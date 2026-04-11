@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.errors import DhcpFetchError, EmptyDhcpLeasesError, UnexpectedMikroTikResponseError
+from app.errors import (
+    DhcpFetchError,
+    EmptyDhcpLeasesError,
+    UnexpectedMikroTikResponseError,
+)
 from app.mikrotik_client import MikroTikClient
 
 logger = logging.getLogger("mikrotrack.collector")
@@ -124,7 +128,9 @@ def get_bridge_hosts(client: MikroTikClient) -> list[dict[str, Any]]:
         bridge_host_resource = client.get_resource("/interface/bridge/host")
         bridge_hosts = bridge_host_resource.get()
     except Exception as error:
-        raise UnexpectedMikroTikResponseError("Failed to fetch bridge host entries") from error
+        raise UnexpectedMikroTikResponseError(
+            "Failed to fetch bridge host entries"
+        ) from error
 
     if not isinstance(bridge_hosts, list):
         raise UnexpectedMikroTikResponseError("Bridge host response is not a list")
@@ -134,7 +140,9 @@ def get_bridge_hosts(client: MikroTikClient) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for index, entry in enumerate(bridge_hosts):
         if not isinstance(entry, dict):
-            raise UnexpectedMikroTikResponseError("Bridge host item is not a dictionary")
+            raise UnexpectedMikroTikResponseError(
+                "Bridge host item is not a dictionary"
+            )
 
         logger.debug("Normalizing bridge host entry #%d", index + 1)
         normalized.append(
@@ -147,7 +155,9 @@ def get_bridge_hosts(client: MikroTikClient) -> list[dict[str, Any]]:
         )
 
     logger.info("Bridge host enriched records count: %d", len(normalized))
-    logger.debug("Bridge host enriched record sample: %s", normalized[0] if normalized else {})
+    logger.debug(
+        "Bridge host enriched record sample: %s", normalized[0] if normalized else {}
+    )
     return normalized
 
 
@@ -166,7 +176,10 @@ def get_interface_macs(client: MikroTikClient) -> list[dict[str, str]]:
             resource = client.get_resource(path)
             entries = resource.get()
         except Exception as error:
-            if path == "/interface/wireless" and _is_expected_unsupported_resource_error(error):
+            if (
+                path == "/interface/wireless"
+                and _is_expected_unsupported_resource_error(error)
+            ):
                 logger.info(
                     "Skipping optional resource %s: unsupported on this device",
                     path,
@@ -177,7 +190,9 @@ def get_interface_macs(client: MikroTikClient) -> list[dict[str, str]]:
             continue
 
         if not isinstance(entries, list):
-            logger.warning("Unexpected response type for %s: %s", path, type(entries).__name__)
+            logger.warning(
+                "Unexpected response type for %s: %s", path, type(entries).__name__
+            )
             continue
 
         for entry in entries:

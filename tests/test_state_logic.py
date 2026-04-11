@@ -12,7 +12,9 @@ FIXED_NOW = "2026-04-11T12:00:00+00:00"
 
 
 def _write_previous_snapshot(tmp: str, device: dict[str, object]) -> None:
-    Path(tmp, "2026-04-11T11-59-00.json").write_text(json.dumps([device]), encoding="utf-8")
+    Path(tmp, "2026-04-11T11-59-00.json").write_text(
+        json.dumps([device]), encoding="utf-8"
+    )
 
 
 def test_state_transition_online_to_idle_updates_idle_since() -> None:
@@ -31,7 +33,9 @@ def test_state_transition_online_to_idle_updates_idle_since() -> None:
         )
 
         with patch("app.persistence._iso_timestamp", return_value=FIXED_NOW):
-            updated = _apply_stable_timestamps([{"mac_address": "AA:BB:CC:DD:EE:10", "fused_state": "idle"}])[0]
+            updated = _apply_stable_timestamps(
+                [{"mac_address": "AA:BB:CC:DD:EE:10", "fused_state": "idle"}]
+            )[0]
 
     assert updated["state_changed_at"] == FIXED_NOW
     assert updated["online_since"] == "2026-04-11T11:00:00+00:00"
@@ -55,13 +59,14 @@ def test_state_transition_idle_to_offline_sets_offline_since() -> None:
         )
 
         with patch("app.persistence._iso_timestamp", return_value=FIXED_NOW):
-            updated = _apply_stable_timestamps([{"mac_address": "AA:BB:CC:DD:EE:11", "fused_state": "offline"}])[0]
+            updated = _apply_stable_timestamps(
+                [{"mac_address": "AA:BB:CC:DD:EE:11", "fused_state": "offline"}]
+            )[0]
 
     assert updated["state_changed_at"] == FIXED_NOW
     assert updated["online_since"] is None
     assert updated["idle_since"] is None
     assert updated["offline_since"] == FIXED_NOW
-
 
 
 def test_state_transition_online_to_offline_sets_offline_since() -> None:
@@ -80,12 +85,15 @@ def test_state_transition_online_to_offline_sets_offline_since() -> None:
         )
 
         with patch("app.persistence._iso_timestamp", return_value=FIXED_NOW):
-            updated = _apply_stable_timestamps([{"mac_address": "AA:BB:CC:DD:EE:14", "fused_state": "offline"}])[0]
+            updated = _apply_stable_timestamps(
+                [{"mac_address": "AA:BB:CC:DD:EE:14", "fused_state": "offline"}]
+            )[0]
 
     assert updated["state_changed_at"] == FIXED_NOW
     assert updated["online_since"] is None
     assert updated["idle_since"] is None
     assert updated["offline_since"] == FIXED_NOW
+
 
 def test_state_transition_offline_to_online_starts_new_session() -> None:
     with TemporaryDirectory() as tmp:
@@ -135,7 +143,14 @@ def test_offline_device_preserves_last_known_fields_when_current_data_missing() 
 
         with patch("app.persistence._iso_timestamp", return_value=FIXED_NOW):
             updated = _apply_stable_timestamps(
-                [{"mac_address": "AA:BB:CC:DD:EE:13", "fused_state": "offline", "ip_address": "", "host_name": ""}]
+                [
+                    {
+                        "mac_address": "AA:BB:CC:DD:EE:13",
+                        "fused_state": "offline",
+                        "ip_address": "",
+                        "host_name": "",
+                    }
+                ]
             )[0]
 
     assert updated["ip_address"] == "192.168.88.130"

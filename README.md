@@ -191,6 +191,22 @@ pytest -q tests/test_ui_regression.py
 - serialization safety для `datetime`, `set`, `tuple`, `bytes`, nested structures
 - UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
 
+### CI (quality gate)
+
+Локальний CI-equivalent мінімум:
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt ruff
+ruff check app web tests
+ruff format --check app web tests
+PYTHONPATH=. pytest -q
+PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
+```
+
+Workflow і деталізований опис quality gate:
+- [`docs/ci-quality-gate.md`](docs/ci-quality-gate.md)
+
 ### Documentation
 
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
@@ -202,6 +218,7 @@ pytest -q tests/test_ui_regression.py
 - Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
 - UI regression tests → [`docs/ui-regression-tests.md`](docs/ui-regression-tests.md)
+- CI quality gate → [`docs/ci-quality-gate.md`](docs/ci-quality-gate.md)
 
 ---
 
@@ -396,6 +413,22 @@ Covered critical scenarios:
 - serialization safety for `datetime`, `set`, `tuple`, `bytes`, and nested structures
 - UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
 
+### CI (quality gate)
+
+Minimal local CI-equivalent sequence:
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt ruff
+ruff check app web tests
+ruff format --check app web tests
+PYTHONPATH=. pytest -q
+PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
+```
+
+Workflow details and quality-gate policy:
+- [`docs/ci-quality-gate.md`](docs/ci-quality-gate.md)
+
 ### Documentation
 
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
@@ -408,3 +441,4 @@ Covered critical scenarios:
 - Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
 - UI regression tests → [`docs/ui-regression-tests.md`](docs/ui-regression-tests.md)
+- CI quality gate → [`docs/ci-quality-gate.md`](docs/ci-quality-gate.md)

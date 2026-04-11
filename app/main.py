@@ -10,7 +10,12 @@ from types import FrameType
 
 import uvicorn
 
-from app.collector import get_arp_entries, get_bridge_hosts, get_dhcp_leases, get_interface_macs
+from app.collector import (
+    get_arp_entries,
+    get_bridge_hosts,
+    get_dhcp_leases,
+    get_interface_macs,
+)
 from app.config import Config, load_config
 from app.device_builder import build_devices
 from app.errors import to_mikrotrack_error
@@ -65,7 +70,6 @@ def _run_once(config: Config, logger: logging.Logger) -> list[dict[str, object]]
     return devices
 
 
-
 def _run_api_server(config: Config, logger: logging.Logger) -> threading.Thread:
     def _serve() -> None:
         uvicorn.run(
@@ -79,6 +83,7 @@ def _run_api_server(config: Config, logger: logging.Logger) -> threading.Thread:
     thread = threading.Thread(target=_serve, daemon=True, name="mikrotrack-api")
     thread.start()
     return thread
+
 
 def _register_signal_handlers(logger: logging.Logger) -> list[bool]:
     should_stop = [False]

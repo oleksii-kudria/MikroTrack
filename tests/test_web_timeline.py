@@ -32,7 +32,9 @@ class TimelineFormattingTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(ip_description, "IP changed from 192.168.88.10 to 192.168.88.11")
+        self.assertEqual(
+            ip_description, "IP changed from 192.168.88.10 to 192.168.88.11"
+        )
         self.assertEqual(source_description, "Source changed from dhcp to arp")
 
     def test_readable_description_for_arp_status_and_state_changes(self) -> None:
@@ -51,15 +53,39 @@ class TimelineFormattingTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(status_description, "ARP status changed from reachable to permanent")
+        self.assertEqual(
+            status_description, "ARP status changed from reachable to permanent"
+        )
         self.assertEqual(state_description, "ARP state changed from online to idle")
 
     def test_groups_events_by_mac_and_timestamp_window(self) -> None:
         events = [
-            {"timestamp": "2026-04-06T10:00:00", "event_type": "IP_CHANGED", "mac": "AA:AA", "old_value": "1", "new_value": "2"},
-            {"timestamp": "2026-04-06T10:00:01", "event_type": "SOURCE_CHANGED", "mac": "AA:AA", "old_value": "dhcp", "new_value": "arp"},
-            {"timestamp": "2026-04-06T10:00:03", "event_type": "DHCP_ADDED", "mac": "AA:AA"},
-            {"timestamp": "2026-04-06T10:00:01", "event_type": "IP_CHANGED", "mac": "BB:BB", "old_value": "3", "new_value": "4"},
+            {
+                "timestamp": "2026-04-06T10:00:00",
+                "event_type": "IP_CHANGED",
+                "mac": "AA:AA",
+                "old_value": "1",
+                "new_value": "2",
+            },
+            {
+                "timestamp": "2026-04-06T10:00:01",
+                "event_type": "SOURCE_CHANGED",
+                "mac": "AA:AA",
+                "old_value": "dhcp",
+                "new_value": "arp",
+            },
+            {
+                "timestamp": "2026-04-06T10:00:03",
+                "event_type": "DHCP_ADDED",
+                "mac": "AA:AA",
+            },
+            {
+                "timestamp": "2026-04-06T10:00:01",
+                "event_type": "IP_CHANGED",
+                "mac": "BB:BB",
+                "old_value": "3",
+                "new_value": "4",
+            },
         ]
 
         grouped = group_events(events)

@@ -26,7 +26,9 @@ def _now_aware() -> datetime:
     return datetime.now(UTC)
 
 
-def configure_persistence(path: str, retention_days: int, *, idle_timeout_seconds: int = 900) -> None:
+def configure_persistence(
+    path: str, retention_days: int, *, idle_timeout_seconds: int = 900
+) -> None:
     global _persistence_path, _retention_days, _idle_timeout_seconds
     _persistence_path = Path(path)
     _retention_days = retention_days
@@ -259,10 +261,14 @@ def _log_event(event: Event) -> None:
         details.append(f"new={event['new_value']}")
 
     suffix = f" ({', '.join(details)})" if details else ""
-    logger.debug("[%s] Event generated for %s%s", event["event_type"], event["mac"], suffix)
+    logger.debug(
+        "[%s] Event generated for %s%s", event["event_type"], event["mac"], suffix
+    )
 
 
-def _log_field_change(mac: str, field_name: str, previous_value: Any, current_value: Any) -> None:
+def _log_field_change(
+    mac: str, field_name: str, previous_value: Any, current_value: Any
+) -> None:
     logger.info(
         "diff: detected change field=%s mac=%s old=%s new=%s",
         field_name,
@@ -321,12 +327,15 @@ def _device_offline_reason(
     arp_status: str,
     bridge_host_present: bool,
 ) -> str:
-    previous_presence_state, current_presence_state = _sanitize_presence_transition(previous_state, current_state)
+    previous_presence_state, current_presence_state = _sanitize_presence_transition(
+        previous_state, current_state
+    )
     if (
         previous_presence_state == "idle"
         and current_presence_state == "offline"
         and not bridge_host_present
-        and normalize_arp_status(arp_status) in {"permanent", "unknown", "stale", "delay", "probe"}
+        and normalize_arp_status(arp_status)
+        in {"permanent", "unknown", "stale", "delay", "probe"}
     ):
         return "idle_timeout"
     return _state_reason(current_state, arp_status, bridge_host_present)
@@ -334,7 +343,11 @@ def _device_offline_reason(
 
 def _normalized_device_state(state: str) -> str:
     normalized = str(state).strip().lower()
-    return normalized if normalized in {"online", "idle", "offline", "unknown"} else "unknown"
+    return (
+        normalized
+        if normalized in {"online", "idle", "offline", "unknown"}
+        else "unknown"
+    )
 
 
 def _normalized_presence_state(state: str) -> str:
@@ -357,7 +370,10 @@ def _has_reconnect_evidence(
     if isinstance(evidence, dict):
         if bool(evidence.get("bridge_host_present", False)):
             return True
-        if normalize_arp_status(evidence.get("arp_status", "unknown")) in {"reachable", "complete"}:
+        if normalize_arp_status(evidence.get("arp_status", "unknown")) in {
+            "reachable",
+            "complete",
+        }:
             return True
 
     return False
@@ -384,21 +400,37 @@ def _derive_device_state(device: dict[str, Any]) -> str:
     bridge_host_present = bool(device.get("bridge_host_present", False))
     arp_status = normalize_arp_status(device.get("arp_status", "unknown"))
     if arp_status == "permanent":
-        logger.info("ARP permanent entry is treated as STATIC metadata for MAC %s", str(device.get("mac_address", "")).strip().upper() or "unknown")
+        logger.info(
+            "ARP permanent entry is treated as STATIC metadata for MAC %s",
+            str(device.get("mac_address", "")).strip().upper() or "unknown",
+        )
 
     if bridge_host_present:
-        logger.debug("State resolved using generic presence rules for MAC %s (state=online)", str(device.get("mac_address", "")).strip().upper() or "unknown")
+        logger.debug(
+            "State resolved using generic presence rules for MAC %s (state=online)",
+            str(device.get("mac_address", "")).strip().upper() or "unknown",
+        )
         return "online"
 
     fused_state = str(device.get("fused_state", "")).strip().lower()
     if fused_state:
         resolved = _normalized_device_state(fused_state)
-        logger.debug("State resolved using generic presence rules for MAC %s (state=%s)", str(device.get("mac_address", "")).strip().upper() or "unknown", resolved)
+        logger.debug(
+            "State resolved using generic presence rules for MAC %s (state=%s)",
+            str(device.get("mac_address", "")).strip().upper() or "unknown",
+            resolved,
+        )
         return resolved
 
     # Backward-compatible fallback for old snapshots without fused_state.
-    resolved = _normalized_device_state(fused_device_state(arp_status, bridge_host_present))
-    logger.debug("State resolved using generic presence rules for MAC %s (state=%s)", str(device.get("mac_address", "")).strip().upper() or "unknown", resolved)
+    resolved = _normalized_device_state(
+        fused_device_state(arp_status, bridge_host_present)
+    )
+    logger.debug(
+        "State resolved using generic presence rules for MAC %s (state=%s)",
+        str(device.get("mac_address", "")).strip().upper() or "unknown",
+        resolved,
+    )
     return resolved
 
 
@@ -421,7 +453,11 @@ def _resolve_previous_effective_state(
         )
         return "offline"
 
-    if previous_state == "idle" and now is not None and _idle_timeout_exceeded(previous=previous, now=now):
+    if (
+        previous_state == "idle"
+        and now is not None
+        and _idle_timeout_exceeded(previous=previous, now=now)
+    ):
         return "offline"
 
     return previous_state
@@ -440,7 +476,9 @@ def _has_presence_evidence(device: dict[str, Any]) -> bool:
         return True
 
     if isinstance(evidence, dict):
-        evidence_arp_status = normalize_arp_status(evidence.get("arp_status", "unknown"))
+        evidence_arp_status = normalize_arp_status(
+            evidence.get("arp_status", "unknown")
+        )
         if evidence_arp_status in {"reachable", "delay"}:
             return True
 
@@ -479,9 +517,19 @@ def _normalized_tracked_value(field: str, device: dict[str, Any]) -> Any:
     if field == "badges":
         badges = device.get("badges", [])
         if isinstance(badges, list):
-            return tuple(sorted(str(item).strip().upper() for item in badges if str(item).strip()))
+            return tuple(
+                sorted(
+                    str(item).strip().upper() for item in badges if str(item).strip()
+                )
+            )
         return tuple()
-    if field in {"dhcp_comment", "arp_comment", "host_name", "interface_name", "arp_type"}:
+    if field in {
+        "dhcp_comment",
+        "arp_comment",
+        "host_name",
+        "interface_name",
+        "arp_type",
+    }:
         return str(device.get(field, "")).strip()
     if field == "dhcp_is_dynamic":
         value = device.get(field)
@@ -492,15 +540,21 @@ def _normalized_tracked_value(field: str, device: dict[str, Any]) -> Any:
     return device.get(field)
 
 
-def _changed_device_fields(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
+def _changed_device_fields(
+    previous: dict[str, Any], current: dict[str, Any]
+) -> list[str]:
     changed: list[str] = []
     for field in _TRACKED_DEVICE_CHANGE_FIELDS:
-        if _normalized_tracked_value(field, previous) != _normalized_tracked_value(field, current):
+        if _normalized_tracked_value(field, previous) != _normalized_tracked_value(
+            field, current
+        ):
             changed.append(field)
     return changed
 
 
-def _resolve_last_known_value(previous: dict[str, Any], current_key: str, last_known_key: str) -> str:
+def _resolve_last_known_value(
+    previous: dict[str, Any], current_key: str, last_known_key: str
+) -> str:
     current = str(previous.get(current_key, "")).strip()
     if current:
         return current
@@ -543,8 +597,12 @@ def _extended_field_changes(
         "hostname": _normalized_optional_text(previous.get("host_name")),
         "dhcp_lease_type": _dhcp_lease_type(previous),
         "dhcp_presence": previous_has_dhcp,
-        "dhcp_flags": previous.get("dhcp_flags", {}) if isinstance(previous.get("dhcp_flags", {}), dict) else {},
-        "arp_flags": previous.get("arp_flags", {}) if isinstance(previous.get("arp_flags", {}), dict) else {},
+        "dhcp_flags": previous.get("dhcp_flags", {})
+        if isinstance(previous.get("dhcp_flags", {}), dict)
+        else {},
+        "arp_flags": previous.get("arp_flags", {})
+        if isinstance(previous.get("arp_flags", {}), dict)
+        else {},
         "dhcp_comment": _normalized_optional_text(previous.get("dhcp_comment")),
         "arp_comment": _normalized_optional_text(previous.get("arp_comment")),
         "source": previous_source or None,
@@ -555,8 +613,12 @@ def _extended_field_changes(
         "hostname": _normalized_optional_text(current.get("host_name")),
         "dhcp_lease_type": _dhcp_lease_type(current),
         "dhcp_presence": current_has_dhcp,
-        "dhcp_flags": current.get("dhcp_flags", {}) if isinstance(current.get("dhcp_flags", {}), dict) else {},
-        "arp_flags": current.get("arp_flags", {}) if isinstance(current.get("arp_flags", {}), dict) else {},
+        "dhcp_flags": current.get("dhcp_flags", {})
+        if isinstance(current.get("dhcp_flags", {}), dict)
+        else {},
+        "arp_flags": current.get("arp_flags", {})
+        if isinstance(current.get("arp_flags", {}), dict)
+        else {},
         "dhcp_comment": _normalized_optional_text(current.get("dhcp_comment")),
         "arp_comment": _normalized_optional_text(current.get("arp_comment")),
         "source": current_source or None,
@@ -582,7 +644,9 @@ def _extended_field_changes(
     return events
 
 
-def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _apply_stable_timestamps(
+    current_devices: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     previous_snapshot_path = _latest_snapshot_path()
     previous_devices: list[dict[str, Any]] = []
     if previous_snapshot_path is not None:
@@ -592,7 +656,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             if isinstance(payload, list):
                 previous_devices = [item for item in payload if isinstance(item, dict)]
         except Exception:
-            logger.warning("Failed to load previous snapshot for stable timestamp propagation")
+            logger.warning(
+                "Failed to load previous snapshot for stable timestamp propagation"
+            )
 
     previous_by_mac = _index_devices_by_mac(previous_devices)
     now_iso = _iso_timestamp()
@@ -645,8 +711,12 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             enriched_devices.append(device)
             continue
 
-        previous_last_known_ip = _resolve_last_known_value(previous, "ip_address", "last_known_ip")
-        previous_last_known_hostname = _resolve_last_known_value(previous, "host_name", "last_known_hostname")
+        previous_last_known_ip = _resolve_last_known_value(
+            previous, "ip_address", "last_known_ip"
+        )
+        previous_last_known_hostname = _resolve_last_known_value(
+            previous, "host_name", "last_known_hostname"
+        )
         if previous_last_known_ip:
             device["last_known_ip"] = previous_last_known_ip
         if previous_last_known_hostname:
@@ -684,7 +754,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             now=now_dt,
             logger_level=logging.INFO,
         )
-        previous_offline_boundary = _parse_snapshot_timestamp(previous.get("offline_since"))
+        previous_offline_boundary = _parse_snapshot_timestamp(
+            previous.get("offline_since")
+        )
 
         merge_current_state = current_state
         decision = "apply_transition_rules"
@@ -692,11 +764,15 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         current_has_reconnect_evidence = _has_reconnect_evidence(
             arp_status=current_arp_status,
             bridge_host_present=bool(device.get("bridge_host_present", False)),
-            evidence=device.get("evidence") if isinstance(device.get("evidence"), dict) else None,
+            evidence=device.get("evidence")
+            if isinstance(device.get("evidence"), dict)
+            else None,
         )
         previous_bridge_host_present = bool(previous.get("bridge_host_present", False))
         current_bridge_host_present = bool(device.get("bridge_host_present", False))
-        bridge_host_lost = previous_bridge_host_present and not current_bridge_host_present
+        bridge_host_lost = (
+            previous_bridge_host_present and not current_bridge_host_present
+        )
         idle_timeout_should_force_offline = (
             previous_state == "idle"
             and current_state != "online"
@@ -753,10 +829,16 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             and previous_offline_boundary is not None
         ):
             transition_previous_state = previous_effective_state
-            logger.debug("Device remains offline, preserving offline_since for MAC %s", mac)
+            logger.debug(
+                "Device remains offline, preserving offline_since for MAC %s", mac
+            )
             logger.debug("Skipping offline transition, state unchanged")
         else:
-            transition_previous_state = previous_state if idle_timeout_should_force_offline else previous_effective_state
+            transition_previous_state = (
+                previous_state
+                if idle_timeout_should_force_offline
+                else previous_effective_state
+            )
         previous_presence_state, current_presence_state = _sanitize_presence_transition(
             transition_previous_state,
             merge_current_state,
@@ -782,9 +864,14 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
         if transition_previous_state != merge_current_state:
             device["state_changed_at"] = now_iso
 
-            if previous_presence_state == "offline" and current_presence_state in {"online", "idle"}:
+            if previous_presence_state == "offline" and current_presence_state in {
+                "online",
+                "idle",
+            }:
                 device["online_since"] = now_iso
-                device["idle_since"] = now_iso if current_presence_state == "idle" else None
+                device["idle_since"] = (
+                    now_iso if current_presence_state == "idle" else None
+                )
                 device["offline_since"] = None
                 decision = "transition_offline_to_online"
                 logger.info(
@@ -792,14 +879,22 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                     mac,
                 )
                 logger.info("Session timer reset for MAC %s", mac)
-            elif previous_presence_state in {"online", "idle"} and current_presence_state == "offline":
+            elif (
+                previous_presence_state in {"online", "idle"}
+                and current_presence_state == "offline"
+            ):
                 device["online_since"] = None
                 device["idle_since"] = None
                 device["offline_since"] = now_iso
                 decision = "transition_online_to_offline"
-            elif previous_presence_state in {"online", "idle"} and current_presence_state in {"online", "idle"}:
+            elif previous_presence_state in {
+                "online",
+                "idle",
+            } and current_presence_state in {"online", "idle"}:
                 device["online_since"] = previous_online_since
-                device["idle_since"] = now_iso if current_presence_state == "idle" else None
+                device["idle_since"] = (
+                    now_iso if current_presence_state == "idle" else None
+                )
                 device["offline_since"] = None
                 decision = "transition_online_idle"
             else:
@@ -814,7 +909,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 now_iso=now_iso,
                 mac=mac,
             )
-            if current_presence_state == "offline" and not bool(device.get("bridge_host_present", False)):
+            if current_presence_state == "offline" and not bool(
+                device.get("bridge_host_present", False)
+            ):
                 device["status"] = "offline"
                 device["active"] = False
 
@@ -846,7 +943,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device["state_changed_at"] = now_iso
             if merge_current_state in {"online", "idle"}:
                 device["online_since"] = previous_online_since
-                device["idle_since"] = previous_idle_since if merge_current_state == "idle" else None
+                device["idle_since"] = (
+                    previous_idle_since if merge_current_state == "idle" else None
+                )
                 device["offline_since"] = None
             elif merge_current_state == "offline":
                 device["online_since"] = None
@@ -862,7 +961,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 now_iso=now_iso,
                 mac=mac,
             )
-            if current_presence_state == "offline" and not bool(device.get("bridge_host_present", False)):
+            if current_presence_state == "offline" and not bool(
+                device.get("bridge_host_present", False)
+            ):
                 device["status"] = "offline"
                 device["active"] = False
             logger.debug(
@@ -893,7 +994,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             device["state_changed_at"] = previous_state_changed_at
             if merge_current_state in {"online", "idle"}:
                 device["online_since"] = previous_online_since
-                device["idle_since"] = previous_idle_since if merge_current_state == "idle" else None
+                device["idle_since"] = (
+                    previous_idle_since if merge_current_state == "idle" else None
+                )
                 device["offline_since"] = None
             elif merge_current_state == "offline":
                 device["online_since"] = None
@@ -909,7 +1012,9 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 now_iso=now_iso,
                 mac=mac,
             )
-            if current_presence_state == "offline" and not bool(device.get("bridge_host_present", False)):
+            if current_presence_state == "offline" and not bool(
+                device.get("bridge_host_present", False)
+            ):
                 device["status"] = "offline"
                 device["active"] = False
             logger.debug(
@@ -966,11 +1071,18 @@ def _initialize_missing_session_timestamps(
         device["offline_since"] = now_iso
         initialized_offline_since = True
 
-    if (initialized_online_since or initialized_idle_since or initialized_offline_since) and not device.get("state_changed_at"):
+    if (
+        initialized_online_since or initialized_idle_since or initialized_offline_since
+    ) and not device.get("state_changed_at"):
         device["state_changed_at"] = now_iso
         initialized_state_changed_at = True
 
-    if initialized_online_since or initialized_idle_since or initialized_offline_since or initialized_state_changed_at:
+    if (
+        initialized_online_since
+        or initialized_idle_since
+        or initialized_offline_since
+        or initialized_state_changed_at
+    ):
         logger.debug(
             "session timestamp initialized: mac=%s state=%s online_since_initialized=%s "
             "idle_since_initialized=%s offline_since_initialized=%s state_changed_at_initialized=%s",
@@ -998,13 +1110,17 @@ def _append_events(events: list[Event]) -> None:
             except Exception:
                 event_type = str(event.get("event_type", "unknown"))
                 mac = str(event.get("mac", "unknown"))
-                logger.exception("Failed to serialize event event_type=%s mac=%s", event_type, mac)
+                logger.exception(
+                    "Failed to serialize event event_type=%s mac=%s", event_type, mac
+                )
                 logger.error("Event payload: %s", safe_event)
 
     if persisted_count:
         logger.info("Events persisted: %d -> %s", persisted_count, events_path)
     else:
-        logger.warning("No events were persisted after serialization attempts: %s", events_path)
+        logger.warning(
+            "No events were persisted after serialization attempts: %s", events_path
+        )
 
 
 def _make_json_safe(value: Any) -> Any:
@@ -1026,7 +1142,9 @@ def _make_json_safe(value: Any) -> Any:
     return str(value)
 
 
-def _generate_diff_events(previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]) -> list[Event]:
+def _generate_diff_events(
+    previous_devices: list[dict[str, Any]], current_devices: list[dict[str, Any]]
+) -> list[Event]:
     previous_by_mac = _index_devices_by_mac(previous_devices)
     current_by_mac = _index_devices_by_mac(current_devices)
     now = _now_aware()
@@ -1090,8 +1208,19 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
         current_ip = str(current.get("ip_address", ""))
         if previous_ip != current_ip:
             changed_count += 1
-            logger.debug("[IP_CHANGED] Device IP changed: %s %s -> %s", mac, previous_ip, current_ip)
-            event = _build_event("IP_CHANGED", mac, device=current, old_value=previous_ip, new_value=current_ip)
+            logger.debug(
+                "[IP_CHANGED] Device IP changed: %s %s -> %s",
+                mac,
+                previous_ip,
+                current_ip,
+            )
+            event = _build_event(
+                "IP_CHANGED",
+                mac,
+                device=current,
+                old_value=previous_ip,
+                new_value=current_ip,
+            )
             events.append(event)
             _log_event(event)
 
@@ -1241,11 +1370,17 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             events.append(event)
             _log_event(event)
 
-        previous_arp_status = normalize_arp_status(previous.get("arp_status", "unknown"))
+        previous_arp_status = normalize_arp_status(
+            previous.get("arp_status", "unknown")
+        )
         current_arp_status = normalize_arp_status(current.get("arp_status", "unknown"))
         if previous_arp_status != current_arp_status:
             changed_count += 1
-            logger.debug("[arp_status_changed] ARP status changed: %s -> %s", previous_arp_status, current_arp_status)
+            logger.debug(
+                "[arp_status_changed] ARP status changed: %s -> %s",
+                previous_arp_status,
+                current_arp_status,
+            )
             event = _build_arp_transition_event(
                 "arp_status_changed",
                 mac,
@@ -1262,7 +1397,11 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
         current_bridge_host_present = bool(current.get("bridge_host_present", False))
         if previous_effective_state != current_fused_state:
             changed_count += 1
-            logger.debug("[arp_state_changed] Fused state changed: %s -> %s", previous_effective_state, current_fused_state)
+            logger.debug(
+                "[arp_state_changed] Fused state changed: %s -> %s",
+                previous_effective_state,
+                current_fused_state,
+            )
             event = _build_arp_transition_event(
                 "arp_state_changed",
                 mac,
@@ -1283,7 +1422,11 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                     current_bridge_host_present,
                 )
                 if current_fused_state != "offline":
-                    reason = _state_reason(current_fused_state, current_arp_status, current_bridge_host_present)
+                    reason = _state_reason(
+                        current_fused_state,
+                        current_arp_status,
+                        current_bridge_host_present,
+                    )
                 device_event = {
                     "timestamp": _iso_timestamp(),
                     "event_type": f"device_{current_fused_state}",
@@ -1297,16 +1440,23 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                 events.append(device_event)
                 _log_event(device_event)
 
-            previous_presence_state, current_presence_state = _sanitize_presence_transition(
-                previous_effective_state,
-                current_fused_state,
-                has_reconnect_evidence=_has_reconnect_evidence(
-                    arp_status=current_arp_status,
-                    bridge_host_present=current_bridge_host_present,
-                    evidence=current.get("evidence") if isinstance(current.get("evidence"), dict) else None,
-                ),
+            previous_presence_state, current_presence_state = (
+                _sanitize_presence_transition(
+                    previous_effective_state,
+                    current_fused_state,
+                    has_reconnect_evidence=_has_reconnect_evidence(
+                        arp_status=current_arp_status,
+                        bridge_host_present=current_bridge_host_present,
+                        evidence=current.get("evidence")
+                        if isinstance(current.get("evidence"), dict)
+                        else None,
+                    ),
+                )
             )
-            if previous_presence_state != "unknown" and current_presence_state != "unknown":
+            if (
+                previous_presence_state != "unknown"
+                and current_presence_state != "unknown"
+            ):
                 state_changed_event = {
                     "timestamp": _iso_timestamp(),
                     "event_type": "state_changed",
@@ -1321,7 +1471,10 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                 events.append(state_changed_event)
                 _log_event(state_changed_event)
 
-                if previous_presence_state == "offline" and current_presence_state in {"online", "idle"}:
+                if previous_presence_state == "offline" and current_presence_state in {
+                    "online",
+                    "idle",
+                }:
                     session_started_event = {
                         "timestamp": _iso_timestamp(),
                         "event_type": "session_started",
@@ -1332,7 +1485,10 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
                     session_started_event.update(_event_context(current))
                     events.append(session_started_event)
                     _log_event(session_started_event)
-                elif previous_presence_state in {"online", "idle"} and current_presence_state == "offline":
+                elif (
+                    previous_presence_state in {"online", "idle"}
+                    and current_presence_state == "offline"
+                ):
                     session_ended_event = {
                         "timestamp": _iso_timestamp(),
                         "event_type": "session_ended",
@@ -1370,8 +1526,18 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
         current_source = _source_value(current)
         if previous_source != current_source:
             changed_count += 1
-            logger.debug("[SOURCE_CHANGED] Device source changed: %s -> %s", previous_source, current_source)
-            event = _build_event("SOURCE_CHANGED", mac, device=current, old_value=previous_source, new_value=current_source)
+            logger.debug(
+                "[SOURCE_CHANGED] Device source changed: %s -> %s",
+                previous_source,
+                current_source,
+            )
+            event = _build_event(
+                "SOURCE_CHANGED",
+                mac,
+                device=current,
+                old_value=previous_source,
+                new_value=current_source,
+            )
             events.append(event)
             _log_event(event)
 
@@ -1391,7 +1557,10 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
 
         previous_interface_name = str(previous.get("interface_name", "")).strip()
         current_interface_name = str(current.get("interface_name", "")).strip()
-        if current_entity_type == "interface" and previous_interface_name != current_interface_name:
+        if (
+            current_entity_type == "interface"
+            and previous_interface_name != current_interface_name
+        ):
             changed_count += 1
             event = _build_event(
                 "interface_detected",
@@ -1408,7 +1577,11 @@ def _generate_diff_events(previous_devices: list[dict[str, Any]], current_device
             continue
 
         removed_count += 1
-        logger.debug("[DEVICE_REMOVED] Device disappeared: %s (%s)", previous.get("ip_address", ""), mac)
+        logger.debug(
+            "[DEVICE_REMOVED] Device disappeared: %s (%s)",
+            previous.get("ip_address", ""),
+            mac,
+        )
         event = _build_event("DEVICE_REMOVED", mac, device=previous)
         events.append(event)
         _log_event(event)

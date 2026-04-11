@@ -3,7 +3,12 @@ from __future__ import annotations
 import unittest
 
 from app.api.main import _arp_flag, _device_state, _dhcp_flag
-from app.collector import get_arp_entries, get_bridge_hosts, get_dhcp_leases, get_interface_macs
+from app.collector import (
+    get_arp_entries,
+    get_bridge_hosts,
+    get_dhcp_leases,
+    get_interface_macs,
+)
 from app.device_builder import _is_random_mac, build_devices
 
 
@@ -42,7 +47,10 @@ class DeviceFlagRenderingTests(unittest.TestCase):
         self.assertEqual(_device_state({"arp_status": "reachable"}), "online")
         self.assertEqual(_device_state({"arp_status": "probe"}), "online")
         self.assertEqual(_device_state({"arp_status": "stale"}), "idle")
-        self.assertEqual(_device_state({"arp_status": "permanent", "bridge_host_present": True}), "online")
+        self.assertEqual(
+            _device_state({"arp_status": "permanent", "bridge_host_present": True}),
+            "online",
+        )
         self.assertEqual(_device_state({"arp_status": "permanent"}), "idle")
 
     def test_device_state_fallback_for_missing_arp_status(self) -> None:
@@ -66,8 +74,16 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         client = _FakeClient(
             {
                 "/ip/dhcp-server/lease": [
-                    {"address": "192.168.88.10", "mac-address": "AA", "dynamic": "true"},
-                    {"address": "192.168.88.11", "mac-address": "BB", "dynamic": "false"},
+                    {
+                        "address": "192.168.88.10",
+                        "mac-address": "AA",
+                        "dynamic": "true",
+                    },
+                    {
+                        "address": "192.168.88.11",
+                        "mac-address": "BB",
+                        "dynamic": "false",
+                    },
                 ]
             }
         )
@@ -84,8 +100,18 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         client = _FakeClient(
             {
                 "/ip/arp": [
-                    {"address": "192.168.88.10", "mac-address": "AA", "dynamic": "true", "complete": "true"},
-                    {"address": "192.168.88.11", "mac-address": "BB", "dynamic": "false", "complete": "false"},
+                    {
+                        "address": "192.168.88.10",
+                        "mac-address": "AA",
+                        "dynamic": "true",
+                        "complete": "true",
+                    },
+                    {
+                        "address": "192.168.88.11",
+                        "mac-address": "BB",
+                        "dynamic": "false",
+                        "complete": "false",
+                    },
                 ]
             }
         )
@@ -189,9 +215,24 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         devices = build_devices(
             dhcp=[],
             arp=[
-                {"mac_address": "AA", "ip_address": "169.254.10.5", "status": "reachable", "dynamic": True},
-                {"mac_address": "AA", "ip_address": "192.168.88.11", "status": "stale", "dynamic": True},
-                {"mac_address": "AA", "ip_address": "192.168.88.12", "status": "failed", "dynamic": True},
+                {
+                    "mac_address": "AA",
+                    "ip_address": "169.254.10.5",
+                    "status": "reachable",
+                    "dynamic": True,
+                },
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.11",
+                    "status": "stale",
+                    "dynamic": True,
+                },
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.12",
+                    "status": "failed",
+                    "dynamic": True,
+                },
             ],
         )
 
@@ -203,8 +244,18 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         devices = build_devices(
             dhcp=[],
             arp=[
-                {"mac_address": "AA", "ip_address": "192.168.88.12", "status": "failed", "dynamic": True},
-                {"mac_address": "AA", "ip_address": "169.254.10.5", "status": "failed", "dynamic": True},
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.12",
+                    "status": "failed",
+                    "dynamic": True,
+                },
+                {
+                    "mac_address": "AA",
+                    "ip_address": "169.254.10.5",
+                    "status": "failed",
+                    "dynamic": True,
+                },
             ],
         )
 
@@ -215,7 +266,12 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         devices = build_devices(
             dhcp=[],
             arp=[
-                {"mac_address": "AA", "ip_address": "192.168.88.12", "status": "permanent", "dynamic": False},
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.12",
+                    "status": "permanent",
+                    "dynamic": False,
+                },
             ],
         )
 
@@ -223,14 +279,26 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertEqual(devices[0]["arp_state"], "idle")
         self.assertIn("STATIC", devices[0]["badges"])
 
-    def test_builder_promotes_permanent_to_online_when_bridge_host_present(self) -> None:
+    def test_builder_promotes_permanent_to_online_when_bridge_host_present(
+        self,
+    ) -> None:
         devices = build_devices(
             dhcp=[],
             arp=[
-                {"mac_address": "AA", "ip_address": "192.168.88.12", "status": "permanent", "dynamic": False},
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.12",
+                    "status": "permanent",
+                    "dynamic": False,
+                },
             ],
             bridge_hosts=[
-                {"mac_address": "AA", "interface": "bridge1", "bridge_host_last_seen": "5s", "bridge_host_present": True}
+                {
+                    "mac_address": "AA",
+                    "interface": "bridge1",
+                    "bridge_host_last_seen": "5s",
+                    "bridge_host_present": True,
+                }
             ],
         )
         self.assertEqual(devices[0]["arp_state"], "online")
@@ -243,7 +311,12 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
             dhcp=[],
             arp=[],
             bridge_hosts=[
-                {"mac_address": "AA", "interface": "bridge1", "bridge_host_last_seen": "5s", "bridge_host_present": True}
+                {
+                    "mac_address": "AA",
+                    "interface": "bridge1",
+                    "bridge_host_last_seen": "5s",
+                    "bridge_host_present": True,
+                }
             ],
         )
 
@@ -255,16 +328,40 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
     def test_builder_does_not_add_bridge_badge_when_arp_or_dhcp_exists(self) -> None:
         with_arp = build_devices(
             dhcp=[],
-            arp=[{"mac_address": "AA", "ip_address": "192.168.88.10", "status": "reachable", "dynamic": True}],
+            arp=[
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.10",
+                    "status": "reachable",
+                    "dynamic": True,
+                }
+            ],
             bridge_hosts=[
-                {"mac_address": "AA", "interface": "bridge1", "bridge_host_last_seen": "5s", "bridge_host_present": True}
+                {
+                    "mac_address": "AA",
+                    "interface": "bridge1",
+                    "bridge_host_last_seen": "5s",
+                    "bridge_host_present": True,
+                }
             ],
         )
         with_dhcp = build_devices(
-            dhcp=[{"mac_address": "BB", "ip_address": "192.168.88.11", "status": "bound", "dynamic": True}],
+            dhcp=[
+                {
+                    "mac_address": "BB",
+                    "ip_address": "192.168.88.11",
+                    "status": "bound",
+                    "dynamic": True,
+                }
+            ],
             arp=[],
             bridge_hosts=[
-                {"mac_address": "BB", "interface": "bridge1", "bridge_host_last_seen": "5s", "bridge_host_present": True}
+                {
+                    "mac_address": "BB",
+                    "interface": "bridge1",
+                    "bridge_host_last_seen": "5s",
+                    "bridge_host_present": True,
+                }
             ],
         )
 
@@ -274,7 +371,14 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
     def test_builder_marks_interface_entity_and_name(self) -> None:
         devices = build_devices(
             dhcp=[],
-            arp=[{"mac_address": "AA", "ip_address": "192.168.88.12", "status": "reachable", "dynamic": False}],
+            arp=[
+                {
+                    "mac_address": "AA",
+                    "ip_address": "192.168.88.12",
+                    "status": "reachable",
+                    "dynamic": False,
+                }
+            ],
             interface_macs=[{"mac_address": "AA", "interface_name": "ether3"}],
         )
 

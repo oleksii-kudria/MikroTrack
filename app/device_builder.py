@@ -55,10 +55,19 @@ def _arp_priority(entry: dict[str, Any]) -> tuple[int, int]:
 
 
 def _select_primary_arp(arp_records: list[dict[str, Any]]) -> dict[str, Any] | None:
-    candidates = [record for record in arp_records if normalize_arp_status(record.get("status", "")) != "failed"]
+    candidates = [
+        record
+        for record in arp_records
+        if normalize_arp_status(record.get("status", "")) != "failed"
+    ]
     if not candidates:
         return None
-    by_status = sorted(candidates, key=lambda entry: _ARP_STATUS_PRIORITY.get(str(entry.get("status", "")).strip().lower(), 2))
+    by_status = sorted(
+        candidates,
+        key=lambda entry: _ARP_STATUS_PRIORITY.get(
+            str(entry.get("status", "")).strip().lower(), 2
+        ),
+    )
     for record in by_status:
         if not _is_link_local(str(record.get("ip_address", ""))):
             return record
@@ -108,7 +117,9 @@ def build_devices(
                 "dynamic": lease.get("dynamic", False),
             },
             "has_dhcp_lease": bool(lease.get("has_dhcp_lease", True)),
-            "dhcp_is_dynamic": bool(lease.get("dhcp_is_dynamic", lease.get("dynamic", False))),
+            "dhcp_is_dynamic": bool(
+                lease.get("dhcp_is_dynamic", lease.get("dynamic", False))
+            ),
             "arp_flags": {
                 "dynamic": False,
                 "dhcp": False,
@@ -137,7 +148,11 @@ def build_devices(
 
     for mac_address, mac_arp_records in arp_records_by_mac.items():
         primary_arp = _select_primary_arp(mac_arp_records)
-        display_arp = primary_arp if primary_arp is not None else sorted(mac_arp_records, key=_arp_priority)[0]
+        display_arp = (
+            primary_arp
+            if primary_arp is not None
+            else sorted(mac_arp_records, key=_arp_priority)[0]
+        )
 
         arp_secondary = [
             record
@@ -229,7 +244,9 @@ def build_devices(
             continue
 
         if arp_ip and (not dhcp_ip or _is_link_local(dhcp_ip)):
-            logger.debug("merge steps: MAC=%s primary IP set from ARP=%s", mac_address, arp_ip)
+            logger.debug(
+                "merge steps: MAC=%s primary IP set from ARP=%s", mac_address, arp_ip
+            )
             existing["ip_address"] = arp_ip
 
     bridge_records_by_mac: dict[str, list[dict[str, Any]]] = {}
@@ -313,7 +330,10 @@ def build_devices(
             badges.append("RANDOM")
         elif arp_status == "permanent":
             badges.append("STATIC")
-            logger.info("ARP permanent entry is treated as STATIC metadata for MAC %s", str(device.get("mac_address", "")).strip().upper() or "unknown")
+            logger.info(
+                "ARP permanent entry is treated as STATIC metadata for MAC %s",
+                str(device.get("mac_address", "")).strip().upper() or "unknown",
+            )
         if _is_link_local(str(device.get("ip_address", ""))):
             badges.append("LINK-LOCAL")
         if (

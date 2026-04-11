@@ -36,7 +36,11 @@ BASE_CURRENT = {
 
 def test_extended_diff_generates_field_change_and_state_related_events() -> None:
     events = _generate_diff_events([BASE_PREVIOUS], [BASE_CURRENT])
-    by_type = {event["event_type"]: event for event in events if event.get("event_type") != "FIELD_CHANGE"}
+    by_type = {
+        event["event_type"]: event
+        for event in events
+        if event.get("event_type") != "FIELD_CHANGE"
+    }
 
     assert "IP_CHANGED" in by_type
     assert by_type["IP_CHANGED"]["old_value"] == "192.168.88.20"
@@ -50,9 +54,13 @@ def test_extended_diff_generates_field_change_and_state_related_events() -> None
     assert by_type["state_changed"]["old_state"] == "online"
     assert by_type["state_changed"]["new_state"] == "offline"
 
-    field_changes = [event for event in events if event.get("event_type") == "FIELD_CHANGE"]
+    field_changes = [
+        event for event in events if event.get("event_type") == "FIELD_CHANGE"
+    ]
     assert field_changes
-    state_change = next(event for event in field_changes if event["field_name"] == "state")
+    state_change = next(
+        event for event in field_changes if event["field_name"] == "state"
+    )
     assert state_change["previous_value"] == "online"
     assert state_change["current_value"] == "offline"
 

@@ -122,7 +122,12 @@ def format_error(exception: Exception) -> dict[str, str]:
 
     if _is_connection_error(exception, error_message):
         os_error_number = getattr(exception, "errno", None)
-        if os_error_number in (errno.ECONNREFUSED, errno.ETIMEDOUT, errno.EHOSTUNREACH, errno.ENETUNREACH):
+        if os_error_number in (
+            errno.ECONNREFUSED,
+            errno.ETIMEDOUT,
+            errno.EHOSTUNREACH,
+            errno.ENETUNREACH,
+        ):
             return {
                 "error": "connection_error",
                 "message": "Unable to connect to MikroTik API. Check IP/port.",
@@ -158,7 +163,14 @@ def format_error(exception: Exception) -> dict[str, str]:
             ),
         }
 
-    if isinstance(exception, (RouterOsApiCommunicationError, RouterOsApiFatalCommunicationError, RouterOsApiParsingError)):
+    if isinstance(
+        exception,
+        (
+            RouterOsApiCommunicationError,
+            RouterOsApiFatalCommunicationError,
+            RouterOsApiParsingError,
+        ),
+    ):
         return {
             "error": "api_protocol_error",
             "message": "MikroTik API protocol error.",

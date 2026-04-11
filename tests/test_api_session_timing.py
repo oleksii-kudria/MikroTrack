@@ -58,7 +58,9 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["idle_since"])
         self.assertIsNone(item["offline_since"])
 
-    def test_idle_keeps_online_since_and_uses_idle_since_for_idle_duration(self) -> None:
+    def test_idle_keeps_online_since_and_uses_idle_since_for_idle_duration(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["PERSISTENCE_PATH"] = tmp
             Path(tmp, "2026-04-08T10-10-00.json").write_text(
@@ -112,7 +114,9 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["offline_since"])
         self.assertIsInstance(item["presence_duration_seconds"], int)
         self.assertIsInstance(item["idle_duration_seconds"], int)
-        self.assertGreaterEqual(item["presence_duration_seconds"], item["idle_duration_seconds"])
+        self.assertGreaterEqual(
+            item["presence_duration_seconds"], item["idle_duration_seconds"]
+        )
 
     def test_offline_sets_offline_since_and_clears_online_since(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -170,7 +174,9 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["presence_duration_seconds"])
         self.assertEqual(item["elapsed_seconds"], item["offline_duration_seconds"])
 
-    def test_api_does_not_fallback_to_snapshot_time_for_missing_timestamps(self) -> None:
+    def test_api_does_not_fallback_to_snapshot_time_for_missing_timestamps(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["PERSISTENCE_PATH"] = tmp
             Path(tmp, "2026-04-08T10-10-00.json").write_text(
