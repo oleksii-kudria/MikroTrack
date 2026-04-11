@@ -50,7 +50,10 @@ def readable_description(event: dict[str, object]) -> str:
 def group_events(events: list[dict[str, object]]) -> list[dict[str, object]]:
     sorted_events = sorted(
         events,
-        key=lambda item: (str(item.get("mac", "")), parse_timestamp(item.get("timestamp"))),
+        key=lambda item: (
+            str(item.get("mac", "")),
+            parse_timestamp(item.get("timestamp")),
+        ),
     )
     groups: list[dict[str, object]] = []
 

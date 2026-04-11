@@ -77,7 +77,9 @@ def _presence_state(state: str | None) -> str:
     return normalized if normalized in {"online", "idle", "offline"} else "unknown"
 
 
-def _sanitize_presence_transition(previous_state: str, current_state: str) -> tuple[str, str]:
+def _sanitize_presence_transition(
+    previous_state: str, current_state: str
+) -> tuple[str, str]:
     prev = _presence_state(previous_state)
     curr = _presence_state(current_state)
     if prev == "offline" and curr == "idle":
@@ -112,7 +114,9 @@ def _read_events(limit: int = 10000) -> list[dict[str, Any]]:
     if not events_file.exists():
         return []
 
-    lines = events_file.read_text(encoding="utf-8").splitlines()[-max(1, min(limit, 20000)):]
+    lines = events_file.read_text(encoding="utf-8").splitlines()[
+        -max(1, min(limit, 20000)) :
+    ]
     items: list[dict[str, Any]] = []
     for line in lines:
         if not line.strip():
@@ -170,7 +174,9 @@ def _is_link_local(ip_raw: str) -> bool:
 
 def _device_state(device: dict[str, Any]) -> str:
     arp_status_raw = normalize_arp_status(device.get("arp_status", ""))
-    arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
+    arp_flags = (
+        device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
+    )
     bridge_host_present = bool(device.get("bridge_host_present", False))
     evidence = device.get("evidence")
     if not bridge_host_present and isinstance(evidence, dict):
@@ -193,7 +199,11 @@ def _device_state(device: dict[str, Any]) -> str:
     return "offline"
 
 
-def _dhcp_flag(has_dhcp_lease: bool, dhcp_flags: dict[str, Any], dhcp_is_dynamic: bool | None = None) -> str | None:
+def _dhcp_flag(
+    has_dhcp_lease: bool,
+    dhcp_flags: dict[str, Any],
+    dhcp_is_dynamic: bool | None = None,
+) -> str | None:
     if not has_dhcp_lease:
         return None
 
@@ -260,7 +270,11 @@ def list_snapshots(limit: int = 20) -> dict[str, object]:
     files = _snapshot_files()[: max(1, min(limit, 200))]
     return {
         "items": [
-            {"filename": file.name, "mtime": file.stat().st_mtime, "size": file.stat().st_size}
+            {
+                "filename": file.name,
+                "mtime": file.stat().st_mtime,
+                "size": file.stat().st_size,
+            }
             for file in files
         ]
     }
@@ -310,7 +324,11 @@ def list_devices() -> dict[str, object]:
     events = _read_events()
     session_by_mac: dict[str, dict[str, datetime | None]] = {}
 
-    sorted_events = sorted(events, key=lambda event: _parse_ts(str(event.get("timestamp", ""))) or datetime.min.replace(tzinfo=UTC))
+    sorted_events = sorted(
+        events,
+        key=lambda event: _parse_ts(str(event.get("timestamp", "")))
+        or datetime.min.replace(tzinfo=UTC),
+    )
     for event in sorted_events:
         mac = str(event.get("mac", "")).strip()
         timestamp = _parse_ts(str(event.get("timestamp", "")))
@@ -331,7 +349,10 @@ def list_devices() -> dict[str, object]:
         session["state_changed_at"] = timestamp
 
         if current_state in {"online", "idle"}:
-            if previous_state not in {"online", "idle"} or session["online_since"] is None:
+            if (
+                previous_state not in {"online", "idle"}
+                or session["online_since"] is None
+            ):
                 session["online_since"] = timestamp
             session["idle_since"] = timestamp if current_state == "idle" else None
             session["offline_since"] = None
@@ -347,10 +368,18 @@ def list_devices() -> dict[str, object]:
             continue
 
         mac = str(device.get("mac_address", ""))
-        dhcp_flags = device.get("dhcp_flags") if isinstance(device.get("dhcp_flags"), dict) else {}
-        arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
+        dhcp_flags = (
+            device.get("dhcp_flags")
+            if isinstance(device.get("dhcp_flags"), dict)
+            else {}
+        )
+        arp_flags = (
+            device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
+        )
         source = device.get("source")
-        source_text = "+".join(source) if isinstance(source, list) else str(source or "-")
+        source_text = (
+            "+".join(source) if isinstance(source, list) else str(source or "-")
+        )
         source_tokens = set(source_text.split("+"))
 
         raw_has_dhcp_lease = device.get("has_dhcp_lease")
@@ -360,13 +389,17 @@ def list_devices() -> dict[str, object]:
             has_dhcp_lease = "dhcp" in source_tokens
 
         raw_dhcp_is_dynamic = device.get("dhcp_is_dynamic")
-        dhcp_is_dynamic = raw_dhcp_is_dynamic if isinstance(raw_dhcp_is_dynamic, bool) else None
+        dhcp_is_dynamic = (
+            raw_dhcp_is_dynamic if isinstance(raw_dhcp_is_dynamic, bool) else None
+        )
         raw_has_arp_entry = device.get("has_arp_entry")
         if isinstance(raw_has_arp_entry, bool):
             has_arp_entry = raw_has_arp_entry
         else:
             has_arp_entry = "arp" in source_tokens
-        bridge_host_present = bool(device.get("bridge_host_present", False) or "bridge_host" in source_tokens)
+        bridge_host_present = bool(
+            device.get("bridge_host_present", False) or "bridge_host" in source_tokens
+        )
         dhcp_flag = _dhcp_flag(has_dhcp_lease, dhcp_flags, dhcp_is_dynamic)
         arp_flag = _arp_flag(has_arp_entry, arp_flags)
         device_state = _device_state(device)
@@ -378,9 +411,19 @@ def list_devices() -> dict[str, object]:
         ip_is_stale = bool(device.get("ip_is_stale", False))
         hostname_is_stale = bool(device.get("hostname_is_stale", False))
         data_is_stale = bool(device.get("data_is_stale", False))
-        arp_secondary = device.get("arp_secondary") if isinstance(device.get("arp_secondary"), list) else []
-        badges = [str(value).strip().upper() for value in device.get("badges", []) if str(value).strip()]
-        entity_type = str(device.get("entity_type", "client")).strip().lower() or "client"
+        arp_secondary = (
+            device.get("arp_secondary")
+            if isinstance(device.get("arp_secondary"), list)
+            else []
+        )
+        badges = [
+            str(value).strip().upper()
+            for value in device.get("badges", [])
+            if str(value).strip()
+        ]
+        entity_type = (
+            str(device.get("entity_type", "client")).strip().lower() or "client"
+        )
         interface_name = str(device.get("interface_name", "")).strip()
         session = session_by_mac.get(mac, {})
 
@@ -391,8 +434,11 @@ def list_devices() -> dict[str, object]:
 
         if isinstance(session, dict):
             event_state_changed_at = session.get("state_changed_at")
-            should_override_from_events = isinstance(event_state_changed_at, datetime) and (
-                not isinstance(state_changed_at, datetime) or event_state_changed_at >= state_changed_at
+            should_override_from_events = isinstance(
+                event_state_changed_at, datetime
+            ) and (
+                not isinstance(state_changed_at, datetime)
+                or event_state_changed_at >= state_changed_at
             )
 
             if should_override_from_events:
@@ -428,7 +474,8 @@ def list_devices() -> dict[str, object]:
 
         presence_duration_seconds = (
             max(0, int((now - online_since).total_seconds()))
-            if resolved_state in {"online", "idle"} and isinstance(online_since, datetime)
+            if resolved_state in {"online", "idle"}
+            and isinstance(online_since, datetime)
             else None
         )
         offline_duration_seconds = (
@@ -482,11 +529,21 @@ def list_devices() -> dict[str, object]:
                 "entity_type": entity_type,
                 "interface_name": interface_name,
                 "active": active,
-                "last_change": state_changed_at.isoformat() if isinstance(state_changed_at, datetime) else None,
-                "state_changed_at": state_changed_at.isoformat() if isinstance(state_changed_at, datetime) else None,
-                "online_since": online_since.isoformat() if isinstance(online_since, datetime) else None,
-                "idle_since": idle_since.isoformat() if isinstance(idle_since, datetime) else None,
-                "offline_since": offline_since.isoformat() if isinstance(offline_since, datetime) else None,
+                "last_change": state_changed_at.isoformat()
+                if isinstance(state_changed_at, datetime)
+                else None,
+                "state_changed_at": state_changed_at.isoformat()
+                if isinstance(state_changed_at, datetime)
+                else None,
+                "online_since": online_since.isoformat()
+                if isinstance(online_since, datetime)
+                else None,
+                "idle_since": idle_since.isoformat()
+                if isinstance(idle_since, datetime)
+                else None,
+                "offline_since": offline_since.isoformat()
+                if isinstance(offline_since, datetime)
+                else None,
                 "presence_duration_seconds": presence_duration_seconds,
                 "offline_duration_seconds": offline_duration_seconds,
                 "idle_duration_seconds": idle_duration_seconds,
@@ -494,5 +551,10 @@ def list_devices() -> dict[str, object]:
             }
         )
 
-    items.sort(key=lambda item: (not bool(item.get("active")), int(item.get("elapsed_seconds", 0))))
+    items.sort(
+        key=lambda item: (
+            not bool(item.get("active")),
+            int(item.get("elapsed_seconds", 0)),
+        )
+    )
     return {"items": items, "generated_at": now.isoformat()}

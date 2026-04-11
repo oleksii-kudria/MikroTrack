@@ -33,7 +33,9 @@ async def timeline(request: Request) -> HTMLResponse:
     except Exception as error:
         error_message = f"Unable to load events from API: {error}"
 
-    timeline_events = sorted(events, key=lambda event: parse_timestamp(event.get("timestamp")), reverse=True)
+    timeline_events = sorted(
+        events, key=lambda event: parse_timestamp(event.get("timestamp")), reverse=True
+    )
     grouped_events = group_events(timeline_events)
     event_types = sorted(
         {
@@ -63,7 +65,9 @@ async def proxy_devices() -> JSONResponse:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(devices_url)
             response.raise_for_status()
-            return JSONResponse(status_code=response.status_code, content=response.json())
+            return JSONResponse(
+                status_code=response.status_code, content=response.json()
+            )
     except Exception as error:
         return JSONResponse(
             status_code=502,
