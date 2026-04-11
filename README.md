@@ -172,6 +172,23 @@ docker compose logs mikrotrack-app --tail=200 | rg "Diff summary|DIFF_|Events pe
 docker compose config | rg "snapshots"
 ```
 
+### Тести (critical logic)
+
+Запуск усіх тестів:
+
+```bash
+pytest -q
+```
+
+Покриті критичні сценарії:
+
+- MAC fallback індексація (`mac_address`/`mac`) і warning при відсутності MAC
+- timezone-aware datetime parsing (`naive`, `+00:00`, `Z`) та idle timeout
+- state transitions (`online→idle`, `idle→offline`, `online→offline`, `offline→online`)
+- extended diff events (`FIELD_CHANGE`, `state_changed`, `IP_CHANGED`, `HOSTNAME_CHANGED`)
+- last-known поля для offline devices (`last_known_ip`, `ip_is_stale`)
+- serialization safety для `datetime`, `set`, `tuple`, `bytes`, nested structures
+
 ### Documentation
 
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
@@ -354,6 +371,23 @@ docker compose logs mikrotrack-app --tail=200 | rg "Diff summary|DIFF_|Events pe
 # 5) verify volume mapping
 docker compose config | rg "snapshots"
 ```
+
+### Tests (critical logic)
+
+Run the full test suite:
+
+```bash
+pytest -q
+```
+
+Covered critical scenarios:
+
+- MAC fallback indexing (`mac_address`/`mac`) and warning when MAC is missing
+- timezone-aware datetime parsing (`naive`, `+00:00`, `Z`) and idle timeout stability
+- state transitions (`online→idle`, `idle→offline`, `online→offline`, `offline→online`)
+- extended diff events (`FIELD_CHANGE`, `state_changed`, `IP_CHANGED`, `HOSTNAME_CHANGED`)
+- last-known fields for offline devices (`last_known_ip`, `ip_is_stale`)
+- serialization safety for `datetime`, `set`, `tuple`, `bytes`, and nested structures
 
 ### Documentation
 
