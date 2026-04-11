@@ -63,6 +63,31 @@ PYTHONPATH=. pytest -q \
 
 Якщо будь-який із цих кроків падає — зміни не готові до merge.
 
+### Pre-commit alignment з CI baseline
+
+У репозиторії додано `.pre-commit-config.yaml` з hooks, що покривають CI baseline для lint/format:
+
+- `ruff` (`app`, `web`, `tests`)
+- `ruff-format` (`app`, `web`, `tests`)
+
+Також додані базові text/yaml sanity checks:
+
+- `trailing-whitespace`
+- `end-of-file-fixer`
+- `check-yaml`
+- `check-added-large-files`
+- `check-merge-conflict`
+
+Швидке налаштування:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+`--no-verify` використовуйте лише як виняток.
+
 ---
 
 ## 🇬🇧 English
@@ -127,3 +152,28 @@ A change is merge-ready only when all of the following are green:
 - frontend-tests
 
 If any of these steps fails, the change is not ready to merge.
+
+### Pre-commit alignment with the CI baseline
+
+The repository now includes `.pre-commit-config.yaml` with hooks aligned to the CI lint/format baseline:
+
+- `ruff` (`app`, `web`, `tests`)
+- `ruff-format` (`app`, `web`, `tests`)
+
+It also includes basic text/yaml sanity checks:
+
+- `trailing-whitespace`
+- `end-of-file-fixer`
+- `check-yaml`
+- `check-added-large-files`
+- `check-merge-conflict`
+
+Quick setup:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+Use `--no-verify` only as an exception.

@@ -207,6 +207,32 @@ PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
 Workflow і деталізований опис quality gate:
 - [`docs/ci-quality-gate.md`](docs/ci-quality-gate.md)
 
+### Pre-commit hooks (recommended developer setup)
+
+Щоб ловити formatting/lint проблеми до push і зменшити "format-only" CI failures:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+Що перевіряють hooks:
+
+- `ruff` (lint для `app`, `web`, `tests`)
+- `ruff-format` (format для `app`, `web`, `tests`)
+- базові hygiene checks (`trailing whitespace`, `end-of-file newline`, `yaml`, `large files`, `merge conflicts`)
+
+Bypass (`git commit --no-verify`) має бути винятком для аварійних випадків, не стандартним workflow.
+
+Рекомендована повна локальна перевірка перед push:
+
+```bash
+pre-commit run --all-files
+PYTHONPATH=. pytest -q
+PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
+```
+
 ### Documentation
 
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
@@ -428,6 +454,32 @@ PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
 
 Workflow details and quality-gate policy:
 - [`docs/ci-quality-gate.md`](docs/ci-quality-gate.md)
+
+### Pre-commit hooks (recommended developer setup)
+
+To catch formatting/lint issues before push and reduce "format-only" CI failures:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+Hooks included:
+
+- `ruff` (lint for `app`, `web`, `tests`)
+- `ruff-format` (formatting for `app`, `web`, `tests`)
+- baseline hygiene checks (`trailing whitespace`, `end-of-file newline`, `yaml`, `large files`, `merge conflicts`)
+
+Bypass (`git commit --no-verify`) should remain an exception for emergency cases, not a normal workflow.
+
+Recommended full local pre-push check:
+
+```bash
+pre-commit run --all-files
+PYTHONPATH=. pytest -q
+PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
+```
 
 ### Documentation
 
