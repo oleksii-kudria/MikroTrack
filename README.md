@@ -192,6 +192,7 @@ pytest -q
 ### Documentation
 
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
+- API contract (Web UI) → [`docs/api-contract.md`](docs/api-contract.md)
 - Device model → [`docs/device-model.md`](docs/device-model.md)
 - Storage/persistence → [`docs/storage.md`](docs/storage.md)
 - Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
@@ -392,6 +393,7 @@ Covered critical scenarios:
 ### Documentation
 
 - Architecture → [`docs/architecture.md`](docs/architecture.md)
+- API contract (Web UI) → [`docs/api-contract.md`](docs/api-contract.md)
 - Device model → [`docs/device-model.md`](docs/device-model.md)
 - Storage/persistence → [`docs/storage.md`](docs/storage.md)
 - Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
