@@ -9,6 +9,18 @@ from app.mikrotik_client import MikroTikClient
 logger = logging.getLogger("mikrotrack.collector")
 
 
+def _is_expected_unsupported_resource_error(error: Exception) -> bool:
+    message = str(error).lower()
+    expected_markers = (
+        "no such command",
+        "no such command prefix",
+        "unknown parameter",
+        "not supported",
+        "resource does not exist",
+    )
+    return any(marker in message for marker in expected_markers)
+
+
 def get_dhcp_leases(client: MikroTikClient) -> list[dict[str, Any]]:
     logger.info("Requesting DHCP leases from MikroTik API")
     logger.debug("Executing API call: /ip/dhcp-server/lease get()")
@@ -154,6 +166,13 @@ def get_interface_macs(client: MikroTikClient) -> list[dict[str, str]]:
             resource = client.get_resource(path)
             entries = resource.get()
         except Exception as error:
+            if path == "/interface/wireless" and _is_expected_unsupported_resource_error(error):
+                logger.info(
+                    "Skipping optional resource %s: unsupported on this device",
+                    path,
+                )
+                logger.debug("Optional resource skip reason for %s: %s", path, error)
+                continue
             logger.warning("Failed to fetch %s entries: %s", path, error)
             continue
 

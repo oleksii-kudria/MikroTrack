@@ -10,7 +10,7 @@ MikroTrack — lightweight collector + API + Web UI для моніторинг�
 - ARP table (`/ip/arp`)
 - Bridge host table (`/interface/bridge/host`)
 - Interface MAC inventory (`/interface`, `/interface/bridge`, `/interface/vlan`)
-- Optional: `/interface/wireless` (якщо недоступний на конкретному RouterOS/device, collector логує warning і продовжує роботу)
+- Optional: `/interface/wireless` (якщо недоступний на конкретному RouterOS/device, collector логує INFO skip і продовжує роботу)
 
 ### Architecture (current runtime)
 
@@ -143,8 +143,8 @@ Minimal examples:
 
 Expected warnings (collector продовжує роботу):
 
-- `Failed to fetch /interface/wireless entries: no such command prefix`
-- `WARNING: Persistence path may not be mounted to host`
+- `Skipping optional resource /interface/wireless: unsupported on this device`
+- `Persistence path may not be mounted to host`
 - `persistence: skipping device without MAC key`
 
 Real errors (потребують втручання):
@@ -212,7 +212,7 @@ MikroTrack is a lightweight collector + API + Web UI for MikroTik network monito
 - ARP table (`/ip/arp`)
 - Bridge host table (`/interface/bridge/host`)
 - Interface MAC inventory (`/interface`, `/interface/bridge`, `/interface/vlan`)
-- Optional: `/interface/wireless` (if unavailable on a specific RouterOS/device, collector logs a warning and continues)
+- Optional: `/interface/wireless` (if unavailable on a specific RouterOS/device, collector logs an INFO skip and continues)
 
 ### Architecture (current runtime)
 
@@ -345,8 +345,8 @@ Minimal examples:
 
 Expected warnings (collector continues):
 
-- `Failed to fetch /interface/wireless entries: no such command prefix`
-- `WARNING: Persistence path may not be mounted to host`
+- `Skipping optional resource /interface/wireless: unsupported on this device`
+- `Persistence path may not be mounted to host`
 - `persistence: skipping device without MAC key`
 
 Real errors (require operator action):
@@ -399,5 +399,6 @@ Covered critical scenarios:
 - Storage/persistence → [`docs/storage.md`](docs/storage.md)
 - Operator playbook → [`docs/operator-playbook.md`](docs/operator-playbook.md)
 - Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
+- Logging policy → [`docs/logging-policy.md`](docs/logging-policy.md)
 - Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
