@@ -32,7 +32,7 @@ def _debug_log_exception(logger: logging.Logger, error: MikroTrackError) -> None
 
 
 def _run_once(config: Config, logger: logging.Logger) -> list[dict[str, object]]:
-    logger.info("Starting collection cycle")
+    logger.info("Collection cycle started")
     cycle_started_at = time.monotonic()
     logger.debug("Collecting DHCP leases")
     with MikroTikClient(
@@ -60,7 +60,7 @@ def _run_once(config: Config, logger: logging.Logger) -> list[dict[str, object]]
     logger.info("Built %d devices", len(devices))
 
     elapsed = time.monotonic() - cycle_started_at
-    logger.info("Collection finished")
+    logger.info("Collection cycle completed")
     logger.debug("Collection cycle duration: %.2fs", elapsed)
     return devices
 
@@ -75,7 +75,7 @@ def _run_api_server(config: Config, logger: logging.Logger) -> threading.Thread:
             log_level=config.log_level.lower(),
         )
 
-    logger.info("Starting API server on %s:%s", config.api_host, config.api_port)
+    logger.info("API server started on %s:%s", config.api_host, config.api_port)
     thread = threading.Thread(target=_serve, daemon=True, name="mikrotrack-api")
     thread.start()
     return thread
@@ -107,7 +107,7 @@ def main() -> None:
 
     setup_logging(config.log_level)
     logger = logging.getLogger("mikrotrack")
-    logger.info("MikroTrack application started")
+    logger.info("Application started")
     logger.debug(
         (
             "Loaded config: host=%s, port=%s, username=%s, use_ssl=%s, "
@@ -147,20 +147,20 @@ def main() -> None:
         _run_api_server(config, logger)
 
     if config.run_mode == "once":
-        logger.info("Starting in ONCE mode")
+        logger.info("Run mode: once")
         try:
             result = _run_once(config, logger)
             if config.persistence_enabled:
                 save_snapshot(result)
 
             if config.print_result_to_stdout:
-                logger.info("Result printed to stdout (optional)")
+                logger.info("Result output: stdout enabled")
                 logger.debug("Output size: %d devices", len(result))
                 logger.debug("Sample device: %s", result[0] if result else {})
                 print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
             else:
-                logger.info("PRINT_RESULT_TO_STDOUT is disabled, skipping JSON output")
-            logger.info("MikroTrack application finished successfully")
+                logger.info("Result output: stdout disabled")
+            logger.info("Application finished successfully")
             return
         except MikroTrackError as error:
             logger.error("[%s] %s", error.error_code, error.message)
@@ -174,7 +174,7 @@ def main() -> None:
             _debug_log_exception(logger, wrapped_error)
             sys.exit(1)
 
-    logger.info("Starting in LOOP mode (interval=%ss)", config.collection_interval)
+    logger.info("Run mode: loop (interval=%ss)", config.collection_interval)
     should_stop = _register_signal_handlers(logger)
     while not should_stop[0]:
         try:
@@ -183,12 +183,12 @@ def main() -> None:
                 save_snapshot(result)
 
             if config.print_result_to_stdout:
-                logger.info("Result printed to stdout (optional)")
+                logger.info("Result output: stdout enabled")
                 logger.debug("Output size: %d devices", len(result))
                 logger.debug("Sample device: %s", result[0] if result else {})
                 print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
             else:
-                logger.info("PRINT_RESULT_TO_STDOUT is disabled, skipping JSON output")
+                logger.info("Result output: stdout disabled")
             sleep_for = config.collection_interval
         except Exception as error:
             wrapped_error = to_mikrotrack_error(error)
@@ -204,13 +204,13 @@ def main() -> None:
         if should_stop[0]:
             break
 
-        logger.info("Sleeping for %d seconds", sleep_for)
+        logger.info("Next collection cycle in %d seconds", sleep_for)
         for _ in range(sleep_for):
             if should_stop[0]:
                 break
             time.sleep(1)
 
-    logger.info("MikroTrack scheduler stopped gracefully")
+    logger.info("Scheduler stopped gracefully")
 
 
 if __name__ == "__main__":

@@ -53,9 +53,9 @@
 
 Це очікувані стани; collector може працювати далі:
 
-- `Failed to fetch /interface/wireless entries: ... no such command prefix`
+- `Skipping optional resource /interface/wireless: unsupported on this device`
   - Причина: на пристрої немає wireless package/resource.
-- `WARNING: Persistence path may not be mounted to host`
+- `Persistence path may not be mounted to host`
   - Причина: path існує в контейнері, але host mount може бути неочевидним.
 - `persistence: skipping device without MAC key`
   - Причина: legacy/invalid snapshot entry без `mac_address`/`mac`.
@@ -153,9 +153,9 @@ Check:
 
 These are expected conditions; collector can continue:
 
-- `Failed to fetch /interface/wireless entries: ... no such command prefix`
+- `Skipping optional resource /interface/wireless: unsupported on this device`
   - Cause: wireless resource/package is unavailable on this device.
-- `WARNING: Persistence path may not be mounted to host`
+- `Persistence path may not be mounted to host`
   - Cause: container path exists, but host mount may be missing/misconfigured.
 - `persistence: skipping device without MAC key`
   - Cause: legacy/invalid snapshot item without `mac_address`/`mac`.

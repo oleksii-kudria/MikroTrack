@@ -55,7 +55,7 @@ def _warn_if_path_not_mounted_to_host() -> None:
 
     resolved_path = _persistence_path.resolve()
     if resolved_path not in mount_points:
-        logger.warning("WARNING: Persistence path may not be mounted to host")
+        logger.warning("Persistence path may not be mounted to host")
         logger.warning("Recommendation: Verify docker-compose volume mapping")
 
 
@@ -654,7 +654,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
 
         if current_state == "offline":
             if not current_ip and previous_last_known_ip:
-                logger.info("Preserving last known IP for MAC %s", mac)
+                logger.debug("Preserving last known IP for MAC %s", mac)
                 device["ip_address"] = previous_last_known_ip
                 device["ip_is_stale"] = True
                 device["data_is_stale"] = True
@@ -662,7 +662,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 device["last_known_ip"] = current_ip
 
             if not current_hostname and previous_last_known_hostname:
-                logger.info("Preserving last known hostname for MAC %s", mac)
+                logger.debug("Preserving last known hostname for MAC %s", mac)
                 device["host_name"] = previous_last_known_hostname
                 device["hostname_is_stale"] = True
                 device["data_is_stale"] = True
@@ -670,7 +670,7 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
                 device["last_known_hostname"] = current_hostname
 
             if device["data_is_stale"]:
-                logger.info("Marking device data as stale for MAC %s", mac)
+                logger.debug("Marking device data as stale for MAC %s", mac)
         else:
             if current_ip:
                 device["last_known_ip"] = current_ip
@@ -753,8 +753,8 @@ def _apply_stable_timestamps(current_devices: list[dict[str, Any]]) -> list[dict
             and previous_offline_boundary is not None
         ):
             transition_previous_state = previous_effective_state
-            logger.info("Device remains offline, preserving offline_since for MAC %s", mac)
-            logger.info("Skipping offline transition, state unchanged")
+            logger.debug("Device remains offline, preserving offline_since for MAC %s", mac)
+            logger.debug("Skipping offline transition, state unchanged")
         else:
             transition_previous_state = previous_state if idle_timeout_should_force_offline else previous_effective_state
         previous_presence_state, current_presence_state = _sanitize_presence_transition(
