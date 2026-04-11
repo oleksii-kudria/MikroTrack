@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     volumes:
-      - /data/snapshots:/data/snapshots
+      - ./data/snapshots:/data/snapshots
     ports:
       - "8000:8000"
 
