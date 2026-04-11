@@ -178,6 +178,7 @@ docker compose config | rg "snapshots"
 
 ```bash
 pytest -q
+pytest -q tests/test_ui_regression.py
 ```
 
 Покриті критичні сценарії:
@@ -188,6 +189,7 @@ pytest -q
 - extended diff events (`FIELD_CHANGE`, `state_changed`, `IP_CHANGED`, `HOSTNAME_CHANGED`)
 - last-known поля для offline devices (`last_known_ip`, `ip_is_stale`)
 - serialization safety для `datetime`, `set`, `tuple`, `bytes`, nested structures
+- UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
 
 ### Documentation
 
@@ -199,6 +201,7 @@ pytest -q
 - Troubleshooting → [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
+- UI regression tests → [`docs/ui-regression-tests.md`](docs/ui-regression-tests.md)
 
 ---
 
@@ -380,6 +383,7 @@ Run the full test suite:
 
 ```bash
 pytest -q
+pytest -q tests/test_ui_regression.py
 ```
 
 Covered critical scenarios:
@@ -390,6 +394,7 @@ Covered critical scenarios:
 - extended diff events (`FIELD_CHANGE`, `state_changed`, `IP_CHANGED`, `HOSTNAME_CHANGED`)
 - last-known fields for offline devices (`last_known_ip`, `ip_is_stale`)
 - serialization safety for `datetime`, `set`, `tuple`, `bytes`, and nested structures
+- UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
 
 ### Documentation
 
@@ -402,3 +407,4 @@ Covered critical scenarios:
 - Logging policy → [`docs/logging-policy.md`](docs/logging-policy.md)
 - Scheduler → [`docs/scheduler.md`](docs/scheduler.md)
 - MikroTik setup → [`docs/mikrotik-setup.md`](docs/mikrotik-setup.md)
+- UI regression tests → [`docs/ui-regression-tests.md`](docs/ui-regression-tests.md)
