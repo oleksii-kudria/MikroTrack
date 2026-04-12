@@ -12,9 +12,7 @@ FIXED_NOW = "2026-04-11T12:00:00+00:00"
 
 
 def _write_previous_snapshot(tmp: str, device: dict[str, object]) -> None:
-    Path(tmp, "2026-04-11T11-59-00.json").write_text(
-        json.dumps([device]), encoding="utf-8"
-    )
+    Path(tmp, "2026-04-11T11-59-00.json").write_text(json.dumps([device]), encoding="utf-8")
 
 
 def test_state_transition_online_to_idle_updates_idle_since() -> None:

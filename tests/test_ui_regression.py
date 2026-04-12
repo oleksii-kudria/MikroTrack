@@ -108,13 +108,13 @@ def test_explicit_single_column_sorting_and_direction_cycle():
         ),
     ]
 
+    assert [row["hostname"] for row in sort_items(items, sort_key="hostname", direction="asc")] == [
+        "alpha",
+        "beta",
+        "gamma",
+    ]
     assert [
-        row["hostname"]
-        for row in sort_items(items, sort_key="hostname", direction="asc")
-    ] == ["alpha", "beta", "gamma"]
-    assert [
-        row["hostname"]
-        for row in sort_items(items, sort_key="hostname", direction="desc")
+        row["hostname"] for row in sort_items(items, sort_key="hostname", direction="desc")
     ] == ["gamma", "beta", "alpha"]
 
     assert [row["ip"] for row in sort_items(items, sort_key="ip", direction="asc")] == [
@@ -122,12 +122,16 @@ def test_explicit_single_column_sorting_and_direction_cycle():
         "192.168.88.15",
         "192.168.88.25",
     ]
-    assert [
-        row["status"] for row in sort_items(items, sort_key="status", direction="desc")
-    ] == ["offline", "idle", "online"]
-    assert [
-        row["mac"] for row in sort_items(items, sort_key="session", direction="asc")
-    ] == ["AA:02", "AA:01", "AA:03"]
+    assert [row["status"] for row in sort_items(items, sort_key="status", direction="desc")] == [
+        "offline",
+        "idle",
+        "online",
+    ]
+    assert [row["mac"] for row in sort_items(items, sort_key="session", direction="asc")] == [
+        "AA:02",
+        "AA:01",
+        "AA:03",
+    ]
 
     assert cycle_direction(None) == "asc"
     assert cycle_direction("asc") == "desc"
@@ -221,9 +225,7 @@ def test_unknown_visibility_and_sorting_without_time_fallback():
         _device("AA:32", status="online", online_since="2026-04-10T12:00:00+00:00"),
     ]
 
-    assert [row["status"] for row in apply_display_mode(items, mode="end_devices")] == [
-        "online"
-    ]
+    assert [row["status"] for row in apply_display_mode(items, mode="end_devices")] == ["online"]
     assert len(apply_display_mode(items, mode="all")) == 3
 
     sorted_items = sort_items(items)

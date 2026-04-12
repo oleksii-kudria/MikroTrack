@@ -64,9 +64,7 @@ def _select_primary_arp(arp_records: list[dict[str, Any]]) -> dict[str, Any] | N
         return None
     by_status = sorted(
         candidates,
-        key=lambda entry: _ARP_STATUS_PRIORITY.get(
-            str(entry.get("status", "")).strip().lower(), 2
-        ),
+        key=lambda entry: _ARP_STATUS_PRIORITY.get(str(entry.get("status", "")).strip().lower(), 2),
     )
     for record in by_status:
         if not _is_link_local(str(record.get("ip_address", ""))):
@@ -117,9 +115,7 @@ def build_devices(
                 "dynamic": lease.get("dynamic", False),
             },
             "has_dhcp_lease": bool(lease.get("has_dhcp_lease", True)),
-            "dhcp_is_dynamic": bool(
-                lease.get("dhcp_is_dynamic", lease.get("dynamic", False))
-            ),
+            "dhcp_is_dynamic": bool(lease.get("dhcp_is_dynamic", lease.get("dynamic", False))),
             "arp_flags": {
                 "dynamic": False,
                 "dhcp": False,
@@ -244,9 +240,7 @@ def build_devices(
             continue
 
         if arp_ip and (not dhcp_ip or _is_link_local(dhcp_ip)):
-            logger.debug(
-                "merge steps: MAC=%s primary IP set from ARP=%s", mac_address, arp_ip
-            )
+            logger.debug("merge steps: MAC=%s primary IP set from ARP=%s", mac_address, arp_ip)
             existing["ip_address"] = arp_ip
 
     bridge_records_by_mac: dict[str, list[dict[str, Any]]] = {}

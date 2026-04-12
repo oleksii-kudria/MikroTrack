@@ -56,9 +56,7 @@ def resolve_assignment(item: dict[str, Any]) -> str | None:
     dhcp_is_static = dhcp_flag == "S"
     arp_is_static = arp_flag.startswith("S")
     bridge_host_present = bool(flags.get("bridge_host_present"))
-    bridge_only = (
-        not flags.get("has_arp_entry") and not has_dhcp_lease and bridge_host_present
-    )
+    bridge_only = not flags.get("has_arp_entry") and not has_dhcp_lease and bridge_host_present
 
     if arp_is_static:
         return "PERM"
@@ -117,9 +115,7 @@ def _compare_nullable(left: Any, right: Any, direction: str, cmp_non_null) -> in
         return 1
     if right is None:
         return -1
-    return (
-        cmp_non_null(left, right) if direction == "asc" else cmp_non_null(right, left)
-    )
+    return cmp_non_null(left, right) if direction == "asc" else cmp_non_null(right, left)
 
 
 def _parse_ip_number(value: Any) -> int | None:
@@ -147,16 +143,8 @@ def _compare_default(left: dict[str, Any], right: dict[str, Any]) -> int:
         return lp - rp
 
     if left_status == "unknown" and right_status == "unknown":
-        left_name = (
-            normalize_text(left.get("hostname"))
-            or normalize_text(left.get("mac"))
-            or ""
-        )
-        right_name = (
-            normalize_text(right.get("hostname"))
-            or normalize_text(right.get("mac"))
-            or ""
-        )
+        left_name = normalize_text(left.get("hostname")) or normalize_text(left.get("mac")) or ""
+        right_name = normalize_text(right.get("hostname")) or normalize_text(right.get("mac")) or ""
         if left_name.lower() < right_name.lower():
             return -1
         if left_name.lower() > right_name.lower():
@@ -170,9 +158,7 @@ def _compare_default(left: dict[str, Any], right: dict[str, Any]) -> int:
     )
 
 
-def _compare_sort_key(
-    left: dict[str, Any], right: dict[str, Any], key: str, direction: str
-) -> int:
+def _compare_sort_key(left: dict[str, Any], right: dict[str, Any], key: str, direction: str) -> int:
     if key == "status":
         pr = STATUS_SORT_PRIORITY[direction]
         ls, rs = normalize_status(left), normalize_status(right)
@@ -212,9 +198,7 @@ def _compare_sort_key(
         lv,
         rv,
         direction,
-        lambda a, b: -1
-        if a.lower() < b.lower()
-        else (1 if a.lower() > b.lower() else 0),
+        lambda a, b: -1 if a.lower() < b.lower() else (1 if a.lower() > b.lower() else 0),
     )
 
 

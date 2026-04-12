@@ -203,9 +203,7 @@ class SnapshotDiffTests(unittest.TestCase):
         by_type = {event["event_type"]: event for event in events}
         self.assertEqual(by_type["DHCP_DYNAMIC_CHANGED"]["old_value"], True)
         self.assertEqual(by_type["DHCP_DYNAMIC_CHANGED"]["new_value"], False)
-        self.assertEqual(
-            by_type["DEVICE_IP_ASSIGNMENT_CHANGED"]["old_value"], "dynamic"
-        )
+        self.assertEqual(by_type["DEVICE_IP_ASSIGNMENT_CHANGED"]["old_value"], "dynamic")
         self.assertEqual(by_type["DEVICE_IP_ASSIGNMENT_CHANGED"]["new_value"], "static")
 
     def test_diff_source_changed_when_dhcp_to_arp_only(self) -> None:
@@ -275,9 +273,7 @@ class SnapshotDiffTests(unittest.TestCase):
                 ]
             )
 
-        field_changes = [
-            event for event in events if event.get("event_type") == "FIELD_CHANGE"
-        ]
+        field_changes = [event for event in events if event.get("event_type") == "FIELD_CHANGE"]
         self.assertTrue(field_changes)
 
         by_field = {str(event["field_name"]): event for event in field_changes}
@@ -292,10 +288,7 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(by_field["dhcp_comment"]["previous_value"], "old-dhcp")
         self.assertIsNone(by_field["dhcp_comment"]["current_value"])
         self.assertTrue(
-            all(
-                event.get("device_mac") == "AA:AA:AA:AA:AA:99"
-                for event in field_changes
-            )
+            all(event.get("device_mac") == "AA:AA:AA:AA:AA:99" for event in field_changes)
         )
 
     def test_extended_diff_no_field_change_events_when_snapshot_unchanged(self) -> None:
@@ -311,15 +304,11 @@ class SnapshotDiffTests(unittest.TestCase):
                 "dhcp_comment": "same",
                 "arp_comment": "same",
             }
-            Path(tmp, "2026-04-05T23-10-00.json").write_text(
-                json.dumps([device]), encoding="utf-8"
-            )
+            Path(tmp, "2026-04-05T23-10-00.json").write_text(json.dumps([device]), encoding="utf-8")
             configure_persistence(tmp, retention_days=7)
             events = process_snapshot_diff([dict(device)])
 
-        field_changes = [
-            event for event in events if event.get("event_type") == "FIELD_CHANGE"
-        ]
+        field_changes = [event for event in events if event.get("event_type") == "FIELD_CHANGE"]
         self.assertEqual(field_changes, [])
 
     def test_diff_error_for_invalid_snapshot_format(self) -> None:
@@ -371,9 +360,7 @@ class SnapshotDiffTests(unittest.TestCase):
             self.assertTrue(events)
             self.assertTrue(events_path.exists())
             field_change = next(
-                event
-                for event in persisted_events
-                if event.get("field_name") == "arp_flags"
+                event for event in persisted_events if event.get("field_name") == "arp_flags"
             )
             labels = field_change["current_value"]["labels"]
             self.assertIsInstance(labels, list)
@@ -477,9 +464,7 @@ class SnapshotDiffTests(unittest.TestCase):
 
         self.assertEqual(started_by_type["state_changed"]["old_state"], "offline")
         self.assertEqual(started_by_type["state_changed"]["new_state"], "online")
-        self.assertEqual(
-            started_by_type["session_started"]["event_type"], "session_started"
-        )
+        self.assertEqual(started_by_type["session_started"]["event_type"], "session_started")
 
         self.assertEqual(ended_by_type["state_changed"]["old_state"], "online")
         self.assertEqual(ended_by_type["state_changed"]["new_state"], "offline")
@@ -507,9 +492,7 @@ class SnapshotDiffTests(unittest.TestCase):
             configure_persistence(tmp, retention_days=7, idle_timeout_seconds=900)
 
             with patch("app.persistence.datetime") as mock_datetime:
-                mock_datetime.now.return_value = datetime.fromisoformat(
-                    "2026-04-08T10:50:00+00:00"
-                )
+                mock_datetime.now.return_value = datetime.fromisoformat("2026-04-08T10:50:00+00:00")
                 mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
 
                 events = process_snapshot_diff(
@@ -614,9 +597,7 @@ class SnapshotDiffTests(unittest.TestCase):
             }
             save_snapshot([first_device])
             first_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
-            first_snapshot = json.loads(
-                first_snapshot_path.read_text(encoding="utf-8")
-            )[0]
+            first_snapshot = json.loads(first_snapshot_path.read_text(encoding="utf-8"))[0]
 
             self.assertIsNotNone(first_snapshot.get("state_changed_at"))
             self.assertIsNotNone(first_snapshot.get("online_since"))
@@ -624,16 +605,10 @@ class SnapshotDiffTests(unittest.TestCase):
 
             save_snapshot([first_device])
             second_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
-            second_snapshot = json.loads(
-                second_snapshot_path.read_text(encoding="utf-8")
-            )[0]
+            second_snapshot = json.loads(second_snapshot_path.read_text(encoding="utf-8"))[0]
 
-        self.assertEqual(
-            second_snapshot["state_changed_at"], first_snapshot["state_changed_at"]
-        )
-        self.assertEqual(
-            second_snapshot["online_since"], first_snapshot["online_since"]
-        )
+        self.assertEqual(second_snapshot["state_changed_at"], first_snapshot["state_changed_at"])
+        self.assertEqual(second_snapshot["online_since"], first_snapshot["online_since"])
         self.assertIsNone(second_snapshot["offline_since"])
 
     def test_save_snapshot_updates_last_change_when_arp_type_changes_without_state_transition(
@@ -738,9 +713,7 @@ class SnapshotDiffTests(unittest.TestCase):
             }
             save_snapshot([first_device])
             first_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
-            first_snapshot = json.loads(
-                first_snapshot_path.read_text(encoding="utf-8")
-            )[0]
+            first_snapshot = json.loads(first_snapshot_path.read_text(encoding="utf-8"))[0]
 
             self.assertIsNotNone(first_snapshot.get("state_changed_at"))
             self.assertIsNotNone(first_snapshot.get("offline_since"))
@@ -748,16 +721,10 @@ class SnapshotDiffTests(unittest.TestCase):
 
             save_snapshot([first_device])
             second_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
-            second_snapshot = json.loads(
-                second_snapshot_path.read_text(encoding="utf-8")
-            )[0]
+            second_snapshot = json.loads(second_snapshot_path.read_text(encoding="utf-8"))[0]
 
-        self.assertEqual(
-            second_snapshot["state_changed_at"], first_snapshot["state_changed_at"]
-        )
-        self.assertEqual(
-            second_snapshot["offline_since"], first_snapshot["offline_since"]
-        )
+        self.assertEqual(second_snapshot["state_changed_at"], first_snapshot["state_changed_at"])
+        self.assertEqual(second_snapshot["offline_since"], first_snapshot["offline_since"])
         self.assertIsNone(second_snapshot["online_since"])
 
     def test_save_snapshot_online_restarts_session_when_offline_since_exists(
@@ -908,9 +875,7 @@ class SnapshotDiffTests(unittest.TestCase):
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))[0]
             events = [
                 json.loads(line)
-                for line in (Path(tmp) / "events.jsonl")
-                .read_text(encoding="utf-8")
-                .splitlines()
+                for line in (Path(tmp) / "events.jsonl").read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
 
@@ -1420,9 +1385,7 @@ class SnapshotDiffTests(unittest.TestCase):
                 ]
             )
             idle_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
-            idle_snapshot = json.loads(idle_snapshot_path.read_text(encoding="utf-8"))[
-                0
-            ]
+            idle_snapshot = json.loads(idle_snapshot_path.read_text(encoding="utf-8"))[0]
 
             save_snapshot(
                 [
@@ -1436,9 +1399,7 @@ class SnapshotDiffTests(unittest.TestCase):
                 ]
             )
             online_snapshot_path = sorted(Path(tmp).glob("*.json"))[-1]
-            online_snapshot = json.loads(
-                online_snapshot_path.read_text(encoding="utf-8")
-            )[0]
+            online_snapshot = json.loads(online_snapshot_path.read_text(encoding="utf-8"))[0]
 
         self.assertEqual(idle_snapshot["online_since"], "2026-04-08T10:00:00+00:00")
         self.assertIsNotNone(idle_snapshot["idle_since"])
@@ -1987,8 +1948,7 @@ class SnapshotDiffTests(unittest.TestCase):
         self.assertEqual(events, persisted_events)
         self.assertTrue(
             any(
-                event.get("event_type") == "FIELD_CHANGE"
-                and event.get("field_name") == "state"
+                event.get("event_type") == "FIELD_CHANGE" and event.get("field_name") == "state"
                 for event in events
             )
         )
@@ -2020,8 +1980,7 @@ class SnapshotDiffTests(unittest.TestCase):
 
         self.assertTrue(
             any(
-                event.get("event_type") == "IP_CHANGED"
-                and event.get("mac") == "AA:AA:AA:AA:AA:01"
+                event.get("event_type") == "IP_CHANGED" and event.get("mac") == "AA:AA:AA:AA:AA:01"
                 for event in events
             )
         )
@@ -2037,9 +1996,7 @@ class SnapshotDiffTests(unittest.TestCase):
                 events = process_snapshot_diff([{"ip_address": "192.168.88.11"}])
 
         self.assertEqual(events, [])
-        self.assertIn(
-            "persistence: skipping device without MAC key", "\n".join(logs.output)
-        )
+        self.assertIn("persistence: skipping device without MAC key", "\n".join(logs.output))
 
 
 if __name__ == "__main__":

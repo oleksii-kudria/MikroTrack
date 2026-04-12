@@ -114,9 +114,7 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIsNone(item["offline_since"])
         self.assertIsInstance(item["presence_duration_seconds"], int)
         self.assertIsInstance(item["idle_duration_seconds"], int)
-        self.assertGreaterEqual(
-            item["presence_duration_seconds"], item["idle_duration_seconds"]
-        )
+        self.assertGreaterEqual(item["presence_duration_seconds"], item["idle_duration_seconds"])
 
     def test_offline_sets_offline_since_and_clears_online_since(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -65,9 +65,7 @@ async def proxy_devices() -> JSONResponse:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(devices_url)
             response.raise_for_status()
-            return JSONResponse(
-                status_code=response.status_code, content=response.json()
-            )
+            return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as error:
         return JSONResponse(
             status_code=502,

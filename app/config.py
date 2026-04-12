@@ -100,15 +100,9 @@ def load_config() -> Config:
         ),
         api_enabled=str_to_bool(os.getenv("API_ENABLED", "true")),
         api_host=os.getenv("API_HOST", "0.0.0.0").strip() or "0.0.0.0",
-        api_port=_parse_positive_int(
-            os.getenv("API_PORT", "8000"), variable_name="API_PORT"
-        ),
+        api_port=_parse_positive_int(os.getenv("API_PORT", "8000"), variable_name="API_PORT"),
         web_host=os.getenv("WEB_HOST", "0.0.0.0").strip() or "0.0.0.0",
-        web_port=_parse_positive_int(
-            os.getenv("WEB_PORT", "8080"), variable_name="WEB_PORT"
-        ),
-        backend_api_url=os.getenv(
-            "BACKEND_API_URL", "http://mikrotrack-app:8000"
-        ).strip()
+        web_port=_parse_positive_int(os.getenv("WEB_PORT", "8080"), variable_name="WEB_PORT"),
+        backend_api_url=os.getenv("BACKEND_API_URL", "http://mikrotrack-app:8000").strip()
         or "http://mikrotrack-app:8000",
     )
