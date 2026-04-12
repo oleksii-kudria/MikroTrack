@@ -88,6 +88,18 @@ pre-commit run --all-files
 
 `--no-verify` використовуйте лише як виняток.
 
+### Formatting baseline (одноразове вирівнювання)
+
+Якщо CI падає на `ruff format --check ...` через "історичні" файли, які були створені до увімкнення hooks:
+
+```bash
+ruff format .
+git add .
+git commit -m "chore: apply repository-wide formatting baseline"
+```
+
+Після такого baseline-коміту локальна перевірка та CI мають поводитися однаково (`local == CI`).
+
 ---
 
 ## 🇬🇧 English
@@ -177,3 +189,15 @@ pre-commit run --all-files
 ```
 
 Use `--no-verify` only as an exception.
+
+### Formatting baseline (one-time normalization)
+
+If CI fails on `ruff format --check ...` because of legacy files created before hooks were enabled:
+
+```bash
+ruff format .
+git add .
+git commit -m "chore: apply repository-wide formatting baseline"
+```
+
+After this baseline commit, local checks and CI should behave the same (`local == CI`).
