@@ -191,13 +191,24 @@ pytest -q tests/test_ui_regression.py
 - serialization safety для `datetime`, `set`, `tuple`, `bytes`, nested structures
 - UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
 
+### Toolchain versions (pinned)
+
+- Python: `3.12` (CI baseline via GitHub Actions)
+- Ruff: `0.4.7` (must match CI + pre-commit)
+
+If your local `ruff --version` is different, reinstall:
+
+```bash
+pip install --upgrade --force-reinstall ruff==0.4.7
+```
+
 ### CI (quality gate)
 
 Локальний CI-equivalent мінімум:
 
 ```bash
 python -m pip install --upgrade pip
-pip install -r requirements.txt ruff
+pip install -r requirements.txt ruff==0.4.7
 ruff check app web tests
 ruff format --check app web tests
 PYTHONPATH=. pytest -q
@@ -448,13 +459,24 @@ Covered critical scenarios:
 - serialization safety for `datetime`, `set`, `tuple`, `bytes`, and nested structures
 - UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
 
+### Toolchain versions (pinned)
+
+- Python: `3.12` (CI baseline via GitHub Actions)
+- Ruff: `0.4.7` (must match CI + pre-commit)
+
+If local `ruff --version` is different, reinstall:
+
+```bash
+pip install --upgrade --force-reinstall ruff==0.4.7
+```
+
 ### CI (quality gate)
 
 Minimal local CI-equivalent sequence:
 
 ```bash
 python -m pip install --upgrade pip
-pip install -r requirements.txt ruff
+pip install -r requirements.txt ruff==0.4.7
 ruff check app web tests
 ruff format --check app web tests
 PYTHONPATH=. pytest -q
@@ -498,6 +520,23 @@ ruff format .
 git add .
 git commit -m "chore: apply repository-wide formatting baseline"
 ```
+
+### Debugging local vs CI formatting drift
+
+If everything is formatted locally but CI reports `Would reformat`:
+
+```bash
+ruff --version
+pre-commit run --all-files
+git diff -- app web tests
+```
+
+Verify that:
+
+- `ruff --version` == `0.4.7`
+- pre-commit is using `rev: v0.4.7`
+- `git ls-files --eol` shows no unexpected `crlf` for source files
+- any changes produced by `pre-commit run --all-files` were committed
 
 ### Documentation
 

@@ -26,11 +26,23 @@ CI запускається автоматично на:
 - `push` у `develop`
 - кожен `pull_request`
 
+### Pinned formatter version
+
+- CI installs `ruff==0.4.7` explicitly.
+- `.pre-commit-config.yaml` uses `astral-sh/ruff-pre-commit` with `rev: v0.4.7`.
+- Local environment must use the same version to avoid drift (`Would reformat ...`).
+
+Check local version:
+
+```bash
+ruff --version
+```
+
 ### Як локально повторити ті самі перевірки
 
 ```bash
 python -m pip install --upgrade pip
-pip install -r requirements.txt ruff
+pip install -r requirements.txt ruff==0.4.7
 
 ruff check app
 ruff check web
@@ -100,6 +112,13 @@ git commit -m "chore: apply repository-wide formatting baseline"
 
 Після такого baseline-коміту локальна перевірка та CI мають поводитися однаково (`local == CI`).
 
+### Якщо CI каже `Would reformat`, а локально все ок
+
+1. Перевірте версію: `ruff --version` (має бути `0.4.7`).
+2. Запустіть: `pre-commit run --all-files`.
+3. Переконайтеся, що немає локальних diffs: `git diff -- app web tests`.
+4. Перевірте line endings: `git ls-files --eol`.
+
 ---
 
 ## 🇬🇧 English
@@ -128,11 +147,23 @@ CI runs automatically on:
 - `push` to `develop`
 - every `pull_request`
 
+### Pinned formatter version
+
+- CI installs `ruff==0.4.7` explicitly.
+- `.pre-commit-config.yaml` uses `astral-sh/ruff-pre-commit` with `rev: v0.4.7`.
+- Local environments should use the same version to prevent formatting drift.
+
+Check your local version:
+
+```bash
+ruff --version
+```
+
 ### How to run the same checks locally
 
 ```bash
 python -m pip install --upgrade pip
-pip install -r requirements.txt ruff
+pip install -r requirements.txt ruff==0.4.7
 
 ruff check app
 ruff check web
@@ -201,3 +232,10 @@ git commit -m "chore: apply repository-wide formatting baseline"
 ```
 
 After this baseline commit, local checks and CI should behave the same (`local == CI`).
+
+### If CI reports `Would reformat` while local is clean
+
+1. Confirm version: `ruff --version` (must be `0.4.7`).
+2. Run: `pre-commit run --all-files`.
+3. Confirm no local diffs: `git diff -- app web tests`.
+4. Check line endings: `git ls-files --eol`.
