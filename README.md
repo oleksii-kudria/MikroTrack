@@ -229,8 +229,17 @@ Bypass (`git commit --no-verify`) має бути винятком для ава
 
 ```bash
 pre-commit run --all-files
+ruff format .
 PYTHONPATH=. pytest -q
 PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
+```
+
+Якщо в репозиторії є історичні невідформатовані файли, зробіть одноразовий formatting baseline-коміт:
+
+```bash
+ruff format .
+git add .
+git commit -m "chore: apply repository-wide formatting baseline"
 ```
 
 ### Documentation
@@ -477,8 +486,17 @@ Recommended full local pre-push check:
 
 ```bash
 pre-commit run --all-files
+ruff format .
 PYTHONPATH=. pytest -q
 PYTHONPATH=. pytest -q tests/test_ui_regression.py tests/test_web_timeline.py
+```
+
+If legacy unformatted files exist in the repo, make a one-time formatting baseline commit:
+
+```bash
+ruff format .
+git add .
+git commit -m "chore: apply repository-wide formatting baseline"
 ```
 
 ### Documentation
