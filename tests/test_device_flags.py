@@ -10,6 +10,7 @@ from app.collector import (
     get_interface_macs,
 )
 from app.device_builder import _is_random_mac, build_devices
+from app.mac_metadata import lookup_mac_vendor
 
 
 class _FakeResource:
@@ -391,6 +392,29 @@ class MikroTikCollectorFlagParsingTests(unittest.TestCase):
         self.assertTrue(_is_random_mac("da:11:22:33:44:55"))
         self.assertFalse(_is_random_mac("00:11:22:33:44:55"))
         self.assertFalse(_is_random_mac("invalid"))
+
+    def test_vendor_lookup_by_oui(self) -> None:
+        self.assertEqual(lookup_mac_vendor("20:37:A5:87:2A:13"), "Apple, Inc.")
+        self.assertIsNone(lookup_mac_vendor("AA:BB:CC:87:2A:13"))
+
+    def test_vendor_lookup_returns_none_for_random_mac(self) -> None:
+        self.assertIsNone(lookup_mac_vendor("9A:CD:38:5D:2E:0A"))
+
+    def test_builder_sets_normalized_mac_metadata_fields(self) -> None:
+        devices = build_devices(
+            dhcp=[
+                {
+                    "mac_address": "20:37:A5:87:2A:13",
+                    "ip_address": "192.168.88.10",
+                    "status": "bound",
+                    "dynamic": False,
+                }
+            ],
+            arp=[],
+        )
+
+        self.assertFalse(devices[0]["is_random_mac"])
+        self.assertEqual(devices[0]["mac_vendor"], "Apple, Inc.")
 
     def test_builder_uses_random_badge_with_highest_priority(self) -> None:
         devices = build_devices(

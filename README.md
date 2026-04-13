@@ -89,6 +89,7 @@ Stable identity/core fields:
 - `mac_address` (primary key)
 - `ip_address`, `host_name`
 - `source`, `entity_type`, `interface_name`, `badges`
+- `is_random_mac`, `mac_vendor` (OUI-based offline enrichment from `app/data/mac_vendors.json`)
 
 State/session fields:
 

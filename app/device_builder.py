@@ -5,6 +5,7 @@ from ipaddress import ip_address
 from typing import Any
 
 from app.arp_logic import fused_device_state, normalize_arp_status
+from app.mac_metadata import is_random_mac, lookup_mac_vendor, normalize_mac
 
 logger = logging.getLogger("mikrotrack.device_builder")
 
@@ -19,22 +20,11 @@ _ARP_STATUS_PRIORITY = {
 
 
 def _normalize_mac(mac_raw: Any) -> str:
-    return str(mac_raw or "").strip().upper()
+    return normalize_mac(mac_raw)
 
 
 def _is_random_mac(mac_raw: Any) -> bool:
-    mac_text = _normalize_mac(mac_raw)
-    parts = mac_text.split(":")
-    if len(parts) != 6:
-        return False
-
-    try:
-        first_octet = int(parts[0], 16)
-    except ValueError:
-        return False
-
-    # Locally administered bit (bit1, where bit0 is multicast bit)
-    return bool(first_octet & 0b00000010)
+    return is_random_mac(mac_raw)
 
 
 def _is_link_local(ip_raw: str) -> bool:
@@ -131,6 +121,8 @@ def build_devices(
             "entity_type": "client",
             "interface_name": "",
             "badges": [],
+            "is_random_mac": False,
+            "mac_vendor": None,
         }
         logger.debug("merge steps: added DHCP device for MAC=%s", mac_address)
 
@@ -203,6 +195,8 @@ def build_devices(
                 "entity_type": "client",
                 "interface_name": "",
                 "badges": [],
+                "is_random_mac": False,
+                "mac_vendor": None,
             }
             logger.debug("merge steps: added ARP-only device for MAC=%s", mac_address)
             continue
@@ -292,6 +286,8 @@ def build_devices(
                 "entity_type": "client",
                 "interface_name": "",
                 "badges": [],
+                "is_random_mac": False,
+                "mac_vendor": None,
             }
             continue
 
@@ -320,7 +316,12 @@ def build_devices(
             fused_state,
         )
         badges: list[str] = []
-        if _is_random_mac(device.get("mac_address", "")):
+        is_random_mac_address = _is_random_mac(device.get("mac_address", ""))
+        mac_vendor = lookup_mac_vendor(device.get("mac_address", ""))
+        device["is_random_mac"] = is_random_mac_address
+        device["mac_vendor"] = mac_vendor
+
+        if is_random_mac_address:
             badges.append("RANDOM")
         elif arp_status == "permanent":
             badges.append("STATIC")

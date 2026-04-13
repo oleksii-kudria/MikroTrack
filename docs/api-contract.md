@@ -18,6 +18,8 @@
   "items": [
     {
       "mac": "AA:BB:CC:DD:EE:FF",
+      "is_random_mac": false,
+      "mac_vendor": "Apple, Inc.",
       "ip": "192.168.1.10",
       "hostname": "laptop",
       "status": "online",
@@ -61,6 +63,8 @@
 | `mac` | string | yes | no | raw | Device MAC (канонічний key для ідентичності). |
 | `ip` | string | yes | no | raw/derived | Поточний `ip_address` зі snapshot; може бути `""`. |
 | `hostname` | string | yes | no | raw/derived | Поточний `host_name`; може бути `""`. |
+| `is_random_mac` | boolean | yes | no | computed | Ознака random/local MAC, обчислюється backend напряму з MAC бітів. |
+| `mac_vendor` | string | yes | yes | computed | Назва вендора за OUI або `null` для random/unknown OUI. |
 
 ### 2) State/session
 
@@ -172,6 +176,8 @@ This document defines the **stable contract** between backend (`collector` + `AP
   "items": [
     {
       "mac": "AA:BB:CC:DD:EE:FF",
+      "is_random_mac": false,
+      "mac_vendor": "Apple, Inc.",
       "ip": "192.168.1.10",
       "hostname": "laptop",
       "status": "online",
@@ -215,6 +221,8 @@ This document defines the **stable contract** between backend (`collector` + `AP
 | `mac` | string | yes | no | raw | Device MAC (canonical identity key). |
 | `ip` | string | yes | no | raw/derived | Current `ip_address` from snapshot; may be `""`. |
 | `hostname` | string | yes | no | raw/derived | Current `host_name`; may be `""`. |
+| `is_random_mac` | boolean | yes | no | computed | Random/local MAC flag computed directly from MAC bit structure. |
+| `mac_vendor` | string | yes | yes | computed | Vendor resolved by OUI or `null` for random/unknown OUI. |
 
 ### 2) State/session
 
