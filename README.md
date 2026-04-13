@@ -46,6 +46,32 @@ services:
       - ./data/snapshots:/data/snapshots
 ```
 
+### Offline MAC vendors DB (`app/data/mac_vendors.json`)
+
+- Runtime uses local OUI snapshot (offline-first, no external API call on lookup).
+- File schema:
+
+```json
+{
+  "version": 1,
+  "updated_at": "2026-04-13T12:00:00+03:00",
+  "source": "offline snapshot",
+  "vendors": {
+    "D850E6": "Apple, Inc."
+  }
+}
+```
+
+- `vendors` keys must be 6-char uppercase hex OUI (`AABBCC`), without separators.
+- At startup app validates file presence + JSON structure and loads map to memory.
+- Manual update command (atomic write):
+
+```bash
+python scripts/update_mac_vendors.py
+# or import from local file
+python scripts/update_mac_vendors.py --from-json /path/to/vendors.json --source "local import"
+```
+
 ### Key parameters
 
 - `RUN_MODE` (`once` / `loop`)
@@ -313,6 +339,32 @@ services:
   mikrotrack-app:
     volumes:
       - ./data/snapshots:/data/snapshots
+```
+
+### Offline MAC vendors DB (`app/data/mac_vendors.json`)
+
+- Runtime uses a local OUI snapshot (offline-first, no external API calls for lookup).
+- File schema:
+
+```json
+{
+  "version": 1,
+  "updated_at": "2026-04-13T12:00:00+03:00",
+  "source": "offline snapshot",
+  "vendors": {
+    "D850E6": "Apple, Inc."
+  }
+}
+```
+
+- `vendors` keys must be 6-char uppercase hex OUI (`AABBCC`) without separators.
+- On startup the app validates file presence + JSON structure and loads the map into memory.
+- Manual update command (atomic write):
+
+```bash
+python scripts/update_mac_vendors.py
+# or import from a local JSON file
+python scripts/update_mac_vendors.py --from-json /path/to/vendors.json --source "local import"
 ```
 
 ### Key parameters
