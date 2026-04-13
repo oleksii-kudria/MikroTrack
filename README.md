@@ -64,12 +64,18 @@ services:
 
 - `vendors` keys must be 6-char uppercase hex OUI (`AABBCC`), without separators.
 - At startup app validates file presence + JSON structure and loads map to memory.
-- Manual update command (atomic write):
+- Оновлення бази з IEEE (UA):
 
 ```bash
 python scripts/update_mac_vendors.py
-# or import from local file
-python scripts/update_mac_vendors.py --from-json /path/to/vendors.json --source "local import"
+python scripts/update_mac_vendors.py --url "https://standards-oui.ieee.org/oui/oui.txt"
+```
+
+- Update vendors DB from IEEE (EN):
+
+```bash
+python scripts/update_mac_vendors.py
+python scripts/update_mac_vendors.py --output app/data/mac_vendors.json --source ieee
 ```
 
 ### Key parameters
