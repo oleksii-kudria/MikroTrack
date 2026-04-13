@@ -1,7 +1,12 @@
 {
-  "00163E": "Cisco Systems, Inc",
-  "3CD92B": "Google, Inc.",
-  "2037A5": "Apple, Inc.",
-  "44D9E7": "Ubiquiti Inc",
-  "F4F5E8": "Samsung Electronics Co.,Ltd"
+  "version": 1,
+  "updated_at": "2026-04-13T08:36:18+00:00",
+  "source": "offline snapshot",
+  "vendors": {
+    "00163E": "Cisco Systems, Inc",
+    "2037A5": "Apple, Inc.",
+    "3CD92B": "Google, Inc.",
+    "44D9E7": "Ubiquiti Inc",
+    "F4F5E8": "Samsung Electronics Co.,Ltd"
+  }
 }

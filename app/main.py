@@ -21,6 +21,7 @@ from app.device_builder import build_devices
 from app.errors import to_mikrotrack_error
 from app.exceptions import MikroTrackError
 from app.logging_config import setup_logging
+from app.mac_metadata import load_vendor_map
 from app.mikrotik_client import MikroTikClient
 from app.persistence import configure_persistence, save_snapshot, validate_persistence
 from app.sanitizer import sanitize
@@ -113,6 +114,7 @@ def main() -> None:
     setup_logging(config.log_level)
     logger = logging.getLogger("mikrotrack")
     logger.info("Application started")
+    load_vendor_map()
     logger.debug(
         (
             "Loaded config: host=%s, port=%s, username=%s, use_ssl=%s, "

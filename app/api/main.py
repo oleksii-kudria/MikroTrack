@@ -11,10 +11,15 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 
 from app.arp_logic import fused_device_state, normalize_arp_status
-from app.mac_metadata import is_random_mac, lookup_mac_vendor
+from app.mac_metadata import is_random_mac, load_vendor_map, lookup_mac_vendor
 
 app = FastAPI(title="MikroTrack API", version="0.1.0")
 logger = logging.getLogger("mikrotrack.api")
+
+
+@app.on_event("startup")
+def _load_mac_vendors_db() -> None:
+    load_vendor_map()
 
 
 def _persistence_path() -> Path:
@@ -362,7 +367,9 @@ def list_devices() -> dict[str, object]:
 
         mac = str(device.get("mac_address", ""))
         raw_is_random_mac = device.get("is_random_mac")
-        is_random_mac_value = raw_is_random_mac if isinstance(raw_is_random_mac, bool) else is_random_mac(mac)
+        is_random_mac_value = (
+            raw_is_random_mac if isinstance(raw_is_random_mac, bool) else is_random_mac(mac)
+        )
         raw_mac_vendor = device.get("mac_vendor")
         if isinstance(raw_mac_vendor, str):
             mac_vendor = raw_mac_vendor.strip() or None
