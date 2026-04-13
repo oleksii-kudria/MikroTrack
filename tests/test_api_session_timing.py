@@ -264,6 +264,32 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertFalse(item["flags"]["has_arp_entry"])
         self.assertFalse(item["flags"]["has_dhcp_lease"])
 
+    def test_api_exposes_mac_metadata_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "20:37:A5:87:2A:13",
+                            "ip_address": "192.168.88.37",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            payload = list_devices()
+            item = payload["items"][0]
+
+        self.assertIn("is_random_mac", item)
+        self.assertIn("mac_vendor", item)
+        self.assertFalse(item["is_random_mac"])
+        self.assertEqual(item["mac_vendor"], "Apple, Inc.")
+
     def test_api_uses_new_online_session_after_offline_reconnect(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ["PERSISTENCE_PATH"] = tmp

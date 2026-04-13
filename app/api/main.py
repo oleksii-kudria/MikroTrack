@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 
 from app.arp_logic import fused_device_state, normalize_arp_status
+from app.mac_metadata import is_random_mac, lookup_mac_vendor
 
 app = FastAPI(title="MikroTrack API", version="0.1.0")
 logger = logging.getLogger("mikrotrack.api")
@@ -360,6 +361,15 @@ def list_devices() -> dict[str, object]:
             continue
 
         mac = str(device.get("mac_address", ""))
+        raw_is_random_mac = device.get("is_random_mac")
+        is_random_mac_value = raw_is_random_mac if isinstance(raw_is_random_mac, bool) else is_random_mac(mac)
+        raw_mac_vendor = device.get("mac_vendor")
+        if isinstance(raw_mac_vendor, str):
+            mac_vendor = raw_mac_vendor.strip() or None
+        else:
+            mac_vendor = None
+        if mac_vendor is None and not is_random_mac_value:
+            mac_vendor = lookup_mac_vendor(mac)
         dhcp_flags = device.get("dhcp_flags") if isinstance(device.get("dhcp_flags"), dict) else {}
         arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
         source = device.get("source")
@@ -466,6 +476,8 @@ def list_devices() -> dict[str, object]:
         items.append(
             {
                 "mac": mac,
+                "is_random_mac": is_random_mac_value,
+                "mac_vendor": mac_vendor,
                 "ip": primary_ip,
                 "last_known_ip": last_known_ip,
                 "is_link_local_ip": _is_link_local(primary_ip),
