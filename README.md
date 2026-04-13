@@ -64,6 +64,8 @@ services:
 
 - `vendors` keys must be 6-char uppercase hex OUI (`AABBCC`), without separators.
 - At startup app validates file presence + JSON structure and loads map to memory.
+- Runtime module: `app/services/mac_vendor_db.py` (`load`, `reload`, `get_vendor`).
+- Lookup flow: normalize MAC (`AA:BB:CC:...` / `AA-BB-CC-...`) → extract OUI (first 6 hex chars) → return vendor or `None`.
 - Оновлення бази з IEEE (UA):
 
 ```bash
@@ -365,6 +367,8 @@ services:
 
 - `vendors` keys must be 6-char uppercase hex OUI (`AABBCC`) without separators.
 - On startup the app validates file presence + JSON structure and loads the map into memory.
+- Runtime module: `app/services/mac_vendor_db.py` (`load`, `reload`, `get_vendor`).
+- Lookup flow: normalize MAC (`AA:BB:CC:...` / `AA-BB-CC-...`) → extract OUI (first 6 hex chars) → return vendor or `None`.
 - Manual update command (atomic write):
 
 ```bash
