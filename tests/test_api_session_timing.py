@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from app.api.main import list_devices
 
@@ -289,6 +290,31 @@ class ApiSessionTimingTests(unittest.TestCase):
         self.assertIn("mac_vendor", item)
         self.assertFalse(item["is_random_mac"])
         self.assertEqual(item["mac_vendor"], "Apple, Inc.")
+
+    def test_api_can_resolve_vendor_for_random_mac_as_informational(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["PERSISTENCE_PATH"] = tmp
+            Path(tmp, "2026-04-08T10-10-00.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "mac_address": "02:11:22:33:44:55",
+                            "ip_address": "192.168.88.50",
+                            "source": ["arp"],
+                            "arp_status": "reachable",
+                            "arp_state": "online",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.api.main.lookup_mac_vendor", return_value="Test Vendor"):
+                payload = list_devices()
+                item = payload["items"][0]
+
+        self.assertTrue(item["is_random_mac"])
+        self.assertEqual(item["mac_vendor"], "Test Vendor")
 
     def test_api_uses_new_online_session_after_offline_reconnect(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
