@@ -32,6 +32,7 @@ MikroTrack уже має production-usable runtime без окремої БД:
 - snapshots: one JSON file per cycle
 - events: append-only `events.jsonl`
 - retention: `PERSISTENCE_RETENTION_DAYS`
+- offline OUI vendor DB: `app/data/mac_vendors.json` (committed artifact, startup-validated)
 
 ---
 
@@ -67,3 +68,4 @@ MikroTrack already provides a production-usable runtime without a dedicated DB:
 - snapshots: one JSON file per cycle
 - events: append-only `events.jsonl`
 - retention: `PERSISTENCE_RETENTION_DAYS`
+- offline OUI vendor DB: `app/data/mac_vendors.json` (committed artifact, startup-validated)

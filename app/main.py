@@ -24,6 +24,7 @@ from app.logging_config import setup_logging
 from app.mac_metadata import load_vendor_map
 from app.mikrotik_client import MikroTikClient
 from app.persistence import configure_persistence, save_snapshot, validate_persistence
+from app.services.mac_vendor_db import MacVendorDBError
 from app.sanitizer import sanitize
 
 RETRY_BACKOFF_SECONDS = 10
@@ -114,7 +115,11 @@ def main() -> None:
     setup_logging(config.log_level)
     logger = logging.getLogger("mikrotrack")
     logger.info("Application started")
-    load_vendor_map()
+    try:
+        load_vendor_map()
+    except MacVendorDBError as error:
+        logger.error("%s", error)
+        sys.exit(1)
     logger.debug(
         (
             "Loaded config: host=%s, port=%s, username=%s, use_ssl=%s, "

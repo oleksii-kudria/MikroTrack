@@ -34,6 +34,7 @@ def test_load_vendor_map_with_valid_file(tmp_path: Path, monkeypatch) -> None:
     )
 
     monkeypatch.setattr(mac_vendor_db, "_VENDOR_DB_PATH", vendor_file)
+    monkeypatch.setattr(mac_vendor_db, "_MIN_VENDOR_ENTRIES", 1)
 
     assert mac_metadata.load_vendor_map() == {"D850E6": "Apple, Inc."}
 
@@ -43,8 +44,9 @@ def test_load_vendor_map_when_file_missing(tmp_path: Path, monkeypatch, caplog) 
     monkeypatch.setattr(mac_vendor_db, "_VENDOR_DB_PATH", vendor_file)
     caplog.set_level(logging.ERROR, logger="mac_vendor_db")
 
-    assert mac_metadata.load_vendor_map() == {}
-    assert "mac_vendors.json not found" in caplog.text
+    with pytest.raises(mac_vendor_db.MacVendorDBError):
+        mac_metadata.load_vendor_map()
+    assert "MAC vendors database file not found" in caplog.text
 
 
 def test_load_vendor_map_when_json_invalid(tmp_path: Path, monkeypatch, caplog) -> None:
@@ -54,8 +56,9 @@ def test_load_vendor_map_when_json_invalid(tmp_path: Path, monkeypatch, caplog) 
     monkeypatch.setattr(mac_vendor_db, "_VENDOR_DB_PATH", vendor_file)
     caplog.set_level(logging.ERROR, logger="mac_vendor_db")
 
-    assert mac_metadata.load_vendor_map() == {}
-    assert "invalid structure" in caplog.text
+    with pytest.raises(mac_vendor_db.MacVendorDBError):
+        mac_metadata.load_vendor_map()
+    assert "MAC vendors database has invalid JSON" in caplog.text
 
 
 def test_load_vendor_map_when_structure_invalid(tmp_path: Path, monkeypatch, caplog) -> None:
@@ -65,8 +68,30 @@ def test_load_vendor_map_when_structure_invalid(tmp_path: Path, monkeypatch, cap
     monkeypatch.setattr(mac_vendor_db, "_VENDOR_DB_PATH", vendor_file)
     caplog.set_level(logging.ERROR, logger="mac_vendor_db")
 
-    assert mac_metadata.load_vendor_map() == {}
-    assert "invalid structure" in caplog.text
+    with pytest.raises(mac_vendor_db.MacVendorDBError):
+        mac_metadata.load_vendor_map()
+    assert "MAC vendors database has invalid structure" in caplog.text
+
+
+def test_load_vendor_map_when_database_is_incomplete(tmp_path: Path, monkeypatch, caplog) -> None:
+    vendor_file = tmp_path / "mac_vendors.json"
+    _write_json(
+        vendor_file,
+        {
+            "version": 1,
+            "updated_at": "2026-04-13T12:00:00+03:00",
+            "source": "offline snapshot",
+            "vendors": {"D850E6": "Apple, Inc."},
+        },
+    )
+
+    monkeypatch.setattr(mac_vendor_db, "_VENDOR_DB_PATH", vendor_file)
+    monkeypatch.setattr(mac_vendor_db, "_MIN_VENDOR_ENTRIES", 10000)
+    caplog.set_level(logging.ERROR, logger="mac_vendor_db")
+
+    with pytest.raises(mac_vendor_db.MacVendorDBError):
+        mac_metadata.load_vendor_map()
+    assert "MAC vendors database looks incomplete" in caplog.text
 
 
 def test_lookup_by_oui(tmp_path: Path, monkeypatch) -> None:
@@ -82,6 +107,7 @@ def test_lookup_by_oui(tmp_path: Path, monkeypatch) -> None:
     )
 
     monkeypatch.setattr(mac_vendor_db, "_VENDOR_DB_PATH", vendor_file)
+    monkeypatch.setattr(mac_vendor_db, "_MIN_VENDOR_ENTRIES", 1)
 
     assert mac_metadata.lookup_mac_vendor("08:bb:cc:11:22:33") == "Vendor B"
     assert mac_metadata.lookup_mac_vendor("11:22:33:11:22:33") is None
