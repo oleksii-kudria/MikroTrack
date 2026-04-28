@@ -100,3 +100,39 @@ def test_validate_non_empty_and_types() -> None:
 
     with pytest.raises(ValueError):
         update_mac_vendors.validate_vendors({"001122": 123})
+
+
+def test_sanity_check_rejects_placeholders() -> None:
+    vendors = {f"{idx:06X}": f"IEEE MA-L Vendor {idx:05d}" for idx in range(1000)}
+    vendors["A1B2C3"] = "Apple, Inc."
+
+    with pytest.raises(ValueError, match="Placeholder vendor names detected"):
+        update_mac_vendors.sanity_check_vendors(vendors)
+
+
+def test_run_uses_input_file_and_writes_output(monkeypatch, tmp_path: Path) -> None:
+    input_file = tmp_path / "oui.csv"
+    output = tmp_path / "mac_vendors.json"
+
+    lines = ["Registry,Assignment,Organization Name"]
+    for idx in range(1000):
+        lines.append(f"MA-L,{idx:06X},Vendor {idx}")
+    lines.append("MA-L,AA-BB-CC,Apple Inc.")
+    input_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _unexpected_download(*args, **kwargs):  # noqa: ANN002,ANN003
+        raise AssertionError("download_registry should not be called with --input-file")
+
+    monkeypatch.setattr(update_mac_vendors, "download_registry", _unexpected_download)
+
+    code = update_mac_vendors.run(
+        url="https://example.com/oui.csv",
+        output_path=output,
+        timeout_seconds=2.0,
+        source="ieee",
+        input_file=input_file,
+    )
+
+    assert code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["vendors"]["AABBCC"] == "Apple Inc."
