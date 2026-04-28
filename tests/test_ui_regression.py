@@ -7,6 +7,7 @@ from web.ui_regression import (
     apply_filters,
     build_summary,
     cycle_direction,
+    hostname_vendor_view,
     sort_items,
     validate_contract_fields,
 )
@@ -274,3 +275,23 @@ def test_contract_assumptions_are_validated_for_required_fields():
     broken = deepcopy(item)
     broken.pop("state_changed_at")
     assert not validate_contract_fields(broken)
+
+
+def test_hostname_cell_view_shows_vendor_when_present():
+    item = _device("AA:60", hostname="IPHONE-okudr", mac_vendor="Apple, Inc.", is_random_mac=False)
+    assert hostname_vendor_view(item) == {"hostname": "IPHONE-okudr", "vendor": "Apple, Inc."}
+
+
+def test_hostname_cell_view_hides_vendor_when_missing():
+    item = _device("AA:61", hostname="DESKTOP-FEDV38V", mac_vendor=None, is_random_mac=False)
+    assert hostname_vendor_view(item) == {"hostname": "DESKTOP-FEDV38V", "vendor": None}
+
+
+def test_hostname_cell_view_supports_dash_hostname_with_vendor():
+    item = _device("AA:62", hostname="", mac_vendor="TP-Link Technologies", is_random_mac=False)
+    assert hostname_vendor_view(item) == {"hostname": "-", "vendor": "TP-Link Technologies"}
+
+
+def test_hostname_cell_view_hides_vendor_for_random_mac():
+    item = _device("AA:63", hostname="phone", mac_vendor="Test Vendor", is_random_mac=True)
+    assert hostname_vendor_view(item) == {"hostname": "phone", "vendor": None}

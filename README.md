@@ -120,6 +120,7 @@ Behavior:
 - `offline → online|idle`: стартує нова online-сесія (`online_since = now`, `offline_since = null`)
 - `unknown`: time fields можуть бути `null`
 - за відсутності explicit sorting UI використовує default state order: `online → idle → offline → unknown`
+- у таблиці Devices `mac_vendor` показується другим рядком під `Hostname` (muted/smaller), але приховується для `is_random_mac=true`
 
 ### Snapshot schema (practical)
 
@@ -229,7 +230,7 @@ pytest -q tests/test_ui_regression.py
 - extended diff events (`FIELD_CHANGE`, `state_changed`, `IP_CHANGED`, `HOSTNAME_CHANGED`)
 - last-known поля для offline devices (`last_known_ip`, `ip_is_stale`)
 - serialization safety для `datetime`, `set`, `tuple`, `bytes`, nested structures
-- UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
+- UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, hostname+vendor rendering rules, contract assumptions
 
 ### Toolchain versions (pinned)
 
@@ -418,6 +419,7 @@ Behavior:
 - `offline → online|idle`: starts a new online session (`online_since = now`, `offline_since = null`)
 - `unknown`: time fields may be `null`
 - without explicit sorting, UI default state order is `online → idle → offline → unknown`
+- in the Devices table, `mac_vendor` is rendered as a muted/smaller second line under `Hostname`, but is hidden for `is_random_mac=true`
 
 ### Snapshot schema (practical)
 
@@ -526,7 +528,7 @@ Covered critical scenarios:
 - extended diff events (`FIELD_CHANGE`, `state_changed`, `IP_CHANGED`, `HOSTNAME_CHANGED`)
 - last-known fields for offline devices (`last_known_ip`, `ip_is_stale`)
 - serialization safety for `datetime`, `set`, `tuple`, `bytes`, and nested structures
-- UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, contract assumptions
+- UI regression: default/explicit sorting, End/All mode, summary-vs-filter separation, unknown handling, empty/null deterministic behavior, hostname+vendor rendering rules, contract assumptions
 
 ### Toolchain versions (pinned)
 
