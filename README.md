@@ -49,6 +49,7 @@ services:
 ### Offline MAC vendors DB (`app/data/mac_vendors.json`)
 
 - Runtime uses local OUI snapshot (offline-first, no external API call on lookup).
+- `app/data/mac_vendors.json` is committed to the repository and available right after `git clone`.
 - File schema:
 
 ```json
@@ -63,18 +64,21 @@ services:
 ```
 
 - `vendors` keys must be 6-char uppercase hex OUI (`AABBCC`), without separators.
-- At startup app validates file presence + JSON structure and loads map to memory.
+- At startup app validates file presence + JSON structure + minimum size (`>=10000` OUI entries).
+- If DB is missing/invalid/incomplete, startup fails fast with English logs:
+  - `ERROR mac_vendor_db: MAC vendors database looks incomplete`
+  - `INFO mac_vendor_db: Loaded MAC vendors database, entries=XXXXX`
 - Runtime module: `app/services/mac_vendor_db.py` (`load`, `reload`, `get_vendor`).
 - Lookup flow: normalize MAC (`AA:BB:CC:...` / `AA-BB-CC-...`) → extract OUI (first 6 hex chars) → return vendor or `None`.
 - For random/local MAC addresses (`is_random_mac=true`), `mac_vendor` is kept as informational-only when OUI lookup succeeds.
-- Оновлення бази з IEEE (UA):
+- Оновлення бази з IEEE MA-L (UA):
 
 ```bash
 python scripts/update_mac_vendors.py
 python scripts/update_mac_vendors.py --url "https://standards-oui.ieee.org/oui/oui.txt"
 ```
 
-- Update vendors DB from IEEE (EN):
+- Update vendors DB from IEEE MA-L (EN):
 
 ```bash
 python scripts/update_mac_vendors.py

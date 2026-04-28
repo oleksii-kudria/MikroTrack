@@ -9,6 +9,7 @@ from pathlib import Path
 logger = logging.getLogger("mac_vendor_db")
 _VENDOR_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "mac_vendors.json"
 _OUI_PATTERN = re.compile(r"^[0-9A-F]{6}$")
+_MIN_VENDOR_ENTRIES = 10000
 
 
 class MacVendorDBError(RuntimeError):
@@ -53,21 +54,28 @@ def _validate_structure(payload: object) -> dict[str, str] | None:
 @lru_cache(maxsize=1)
 def load() -> dict[str, str]:
     if not _VENDOR_DB_PATH.exists():
-        logger.error("mac_vendors.json not found")
-        return {}
+        message = "MAC vendors database file not found"
+        logger.error(message)
+        raise MacVendorDBError(message)
 
     try:
         payload = json.loads(_VENDOR_DB_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        logger.error("invalid structure")
-        return {}
+        message = "MAC vendors database has invalid JSON"
+        logger.error(message)
+        raise MacVendorDBError(message)
 
     vendors = _validate_structure(payload)
     if vendors is None:
-        logger.error("invalid structure")
-        return {}
+        message = "MAC vendors database has invalid structure"
+        logger.error(message)
+        raise MacVendorDBError(message)
 
-    logger.info("Loaded MAC vendors database")
+    if len(vendors) < _MIN_VENDOR_ENTRIES:
+        logger.error("MAC vendors database looks incomplete")
+        raise MacVendorDBError("MAC vendors database looks incomplete")
+
+    logger.info("Loaded MAC vendors database, entries=%s", len(vendors))
     return vendors
 
 

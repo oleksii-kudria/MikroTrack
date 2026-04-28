@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 
 from app.arp_logic import fused_device_state, normalize_arp_status
 from app.mac_metadata import is_random_mac, load_vendor_map, lookup_mac_vendor
+from app.services.mac_vendor_db import MacVendorDBError
 
 app = FastAPI(title="MikroTrack API", version="0.1.0")
 logger = logging.getLogger("mikrotrack.api")
@@ -19,7 +20,11 @@ logger = logging.getLogger("mikrotrack.api")
 
 @app.on_event("startup")
 def _load_mac_vendors_db() -> None:
-    load_vendor_map()
+    try:
+        load_vendor_map()
+    except MacVendorDBError:
+        logger.exception("MAC vendors DB startup validation failed")
+        raise
 
 
 def _persistence_path() -> Path:
