@@ -66,6 +66,7 @@ services:
 - At startup app validates file presence + JSON structure and loads map to memory.
 - Runtime module: `app/services/mac_vendor_db.py` (`load`, `reload`, `get_vendor`).
 - Lookup flow: normalize MAC (`AA:BB:CC:...` / `AA-BB-CC-...`) → extract OUI (first 6 hex chars) → return vendor or `None`.
+- For random/local MAC addresses (`is_random_mac=true`), `mac_vendor` is kept as informational-only when OUI lookup succeeds.
 - Оновлення бази з IEEE (UA):
 
 ```bash
@@ -369,6 +370,7 @@ services:
 - On startup the app validates file presence + JSON structure and loads the map into memory.
 - Runtime module: `app/services/mac_vendor_db.py` (`load`, `reload`, `get_vendor`).
 - Lookup flow: normalize MAC (`AA:BB:CC:...` / `AA-BB-CC-...`) → extract OUI (first 6 hex chars) → return vendor or `None`.
+- For random/local MAC addresses (`is_random_mac=true`), `mac_vendor` is returned as informational-only when lookup succeeds.
 - Manual update command (atomic write):
 
 ```bash

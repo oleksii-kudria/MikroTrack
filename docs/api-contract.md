@@ -64,7 +64,7 @@
 | `ip` | string | yes | no | raw/derived | Поточний `ip_address` зі snapshot; може бути `""`. |
 | `hostname` | string | yes | no | raw/derived | Поточний `host_name`; може бути `""`. |
 | `is_random_mac` | boolean | yes | no | computed | Ознака random/local MAC, обчислюється backend напряму з MAC бітів. |
-| `mac_vendor` | string | yes | yes | computed | Назва вендора за OUI або `null` для random/unknown OUI. |
+| `mac_vendor` | string | yes | yes | computed | Назва вендора за OUI або `null` для невалідного/unknown OUI; для random MAC — informational-only. |
 
 ### 2) State/session
 
@@ -222,7 +222,7 @@ This document defines the **stable contract** between backend (`collector` + `AP
 | `ip` | string | yes | no | raw/derived | Current `ip_address` from snapshot; may be `""`. |
 | `hostname` | string | yes | no | raw/derived | Current `host_name`; may be `""`. |
 | `is_random_mac` | boolean | yes | no | computed | Random/local MAC flag computed directly from MAC bit structure. |
-| `mac_vendor` | string | yes | yes | computed | Vendor resolved by OUI or `null` for random/unknown OUI. |
+| `mac_vendor` | string | yes | yes | computed | Vendor resolved by OUI or `null` for invalid/unknown OUI; for random MAC it is informational-only. |
 
 ### 2) State/session
 

@@ -375,7 +375,7 @@ def list_devices() -> dict[str, object]:
             mac_vendor = raw_mac_vendor.strip() or None
         else:
             mac_vendor = None
-        if mac_vendor is None and not is_random_mac_value:
+        if mac_vendor is None:
             mac_vendor = lookup_mac_vendor(mac)
         dhcp_flags = device.get("dhcp_flags") if isinstance(device.get("dhcp_flags"), dict) else {}
         arp_flags = device.get("arp_flags") if isinstance(device.get("arp_flags"), dict) else {}
