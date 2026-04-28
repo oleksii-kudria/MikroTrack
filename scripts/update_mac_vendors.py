@@ -10,7 +10,7 @@ import re
 import tempfile
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -104,7 +104,7 @@ def validate_vendors(vendors: Any) -> dict[str, str]:
 def build_payload(vendors: dict[str, str], source: str) -> dict[str, Any]:
     return {
         "version": 1,
-        "updated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "source": source,
         "vendors": dict(sorted(vendors.items())),
     }
