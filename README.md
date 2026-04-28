@@ -233,7 +233,7 @@ pytest -q tests/test_ui_regression.py
 
 ### Toolchain versions (pinned)
 
-- Python: `3.12` (CI baseline via GitHub Actions)
+- Python: `3.10+` (runtime compatibility; CI baseline via GitHub Actions: `3.12`)
 - Ruff: `0.4.7` (must match CI + pre-commit)
 
 If your local `ruff --version` is different, reinstall:
@@ -530,7 +530,7 @@ Covered critical scenarios:
 
 ### Toolchain versions (pinned)
 
-- Python: `3.12` (CI baseline via GitHub Actions)
+- Python: `3.10+` (runtime compatibility; CI baseline via GitHub Actions: `3.12`)
 - Ruff: `0.4.7` (must match CI + pre-commit)
 
 If local `ruff --version` is different, reinstall:
