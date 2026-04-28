@@ -444,6 +444,18 @@
         color: #6b7280;
       }
 
+      .hostname-cell {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .hostname-vendor {
+        font-size: 0.75rem;
+        color: var(--muted);
+        line-height: 1.2;
+      }
+
       .badge-comment {
         max-width: 380px;
       }
@@ -1182,10 +1194,15 @@
 
       const buildHostnameCell = (item) => {
         const hostnameText = String(item.hostname || "").trim() || "-";
-        if (!Boolean(item.hostname_is_stale)) {
-          return escapeHtml(hostnameText);
+        const hostnameMarkup = Boolean(item.hostname_is_stale)
+          ? `<span class="stale-value" title="Last seen hostname before DHCP lease expired">${escapeHtml(hostnameText)}</span>`
+          : escapeHtml(hostnameText);
+        const vendorText = String(item.mac_vendor || "").trim();
+        const showVendor = Boolean(vendorText) && !Boolean(item.is_random_mac);
+        if (!showVendor) {
+          return hostnameMarkup;
         }
-        return `<span class="stale-value" title="Last seen hostname before DHCP lease expired">${escapeHtml(hostnameText)}</span>`;
+        return `<span class="hostname-cell">${hostnameMarkup}<span class="hostname-vendor">${escapeHtml(vendorText)}</span></span>`;
       };
 
       const buildSessionCell = (item) => {
