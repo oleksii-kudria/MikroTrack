@@ -16,10 +16,10 @@ def normalize_text(value: Any) -> str | None:
     return text if text and text != "-" else None
 
 
-def hostname_vendor_view(item: dict[str, Any]) -> dict[str, str | None]:
+def hostname_vendor_view(item: dict[str, Any], show_mac_vendor: bool = True) -> dict[str, str | None]:
     hostname_text = normalize_text(item.get("hostname")) or "-"
     vendor_text = normalize_text(item.get("mac_vendor"))
-    if bool(item.get("is_random_mac")):
+    if not show_mac_vendor or bool(item.get("is_random_mac")):
         vendor_text = None
     return {
         "hostname": hostname_text,

@@ -12,4 +12,5 @@ def test_hostname_vendor_is_rendered_in_hostname_cell_without_extra_vendor_colum
     assert 'data-sort-key="vendor"' not in content
     assert ">Vendor<" not in content
     assert "hostname-vendor" in content
-
+    assert 'id="toggle-mac-vendor"' in content
+    assert "showMacVendor && Boolean(vendorText) && !Boolean(item.is_random_mac)" in content
