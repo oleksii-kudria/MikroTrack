@@ -17,8 +17,9 @@
 - **Unknown behavior**: видимість залежно від mode + відсутність fallback до time sorting.
 - **Empty/null stability**: порожні `hostname`, `ip`, `*_since` не ламають deterministic sorting.
 - **Hostname + vendor rendering**:
-  - `mac_vendor` показується другим рядком під `Hostname` (compact/muted style).
-  - для `is_random_mac=true` vendor приховується.
+  - кнопка `MAC` у toolbar керує видимістю vendor-рядка.
+  - `mac_vendor` показується другим рядком під `Hostname` (compact/muted style) лише коли `MAC` активна.
+  - для `is_random_mac=true` vendor приховується незалежно від стану кнопки `MAC`.
   - відсутній `mac_vendor` не додає другий рядок.
   - порожній hostname відображається як `-`, vendor все одно може бути показаний.
 - **Contract assumptions**: перевірка обов'язкових полів UI/API contract (`status`, `state_changed_at`, `online_since`, `idle_since`, `offline_since`, `last_known_ip`, `last_known_hostname`, stale flags).
@@ -54,8 +55,9 @@ This test set protects critical Web UI behavior before Phase 2.
 - **Unknown behavior**: mode visibility + no fallback to time-based sorting.
 - **Empty/null stability**: empty `hostname`, `ip`, and `*_since` values do not break deterministic sorting.
 - **Hostname + vendor rendering**:
-  - `mac_vendor` is shown as a second line under `Hostname` (compact/muted style).
-  - vendor is hidden when `is_random_mac=true`.
+  - `MAC` button in the toolbar controls visibility of the vendor sub-line.
+  - `mac_vendor` is shown as a second line under `Hostname` (compact/muted style) only when `MAC` is active.
+  - vendor is hidden when `is_random_mac=true` regardless of the `MAC` toggle state.
   - missing `mac_vendor` does not add a second line.
   - empty hostname is rendered as `-`, while vendor may still be shown.
 - **Contract assumptions**: required UI/API fields are checked (`status`, `state_changed_at`, `online_since`, `idle_since`, `offline_since`, `last_known_ip`, `last_known_hostname`, stale flags).

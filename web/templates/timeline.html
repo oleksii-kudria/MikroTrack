@@ -687,6 +687,7 @@
                 </div>
               </div>
               <div class="toolbar-group refresh-controls">
+                <button id="toggle-mac-vendor" class="mode-segment active" type="button" aria-pressed="true" title="Toggle MAC vendor visibility">MAC</button>
                 <button id="devices-clear-sort" class="icon-btn" type="button" title="Sort" aria-label="Sort">⇅</button>
                 <button id="devices-refresh" class="icon-btn" type="button" title="Refresh" aria-label="Refresh">⟳</button>
                 <label class="auto-refresh-toggle" for="auto-refresh" title="Toggle auto refresh">
@@ -808,6 +809,7 @@
       const devicesTable = document.getElementById("devices-table");
       const deviceSortableHeaders = Array.from(document.querySelectorAll("#devices-panel th.sortable"));
       const autoRefreshToggle = document.getElementById("auto-refresh");
+      const macVendorToggleButton = document.getElementById("toggle-mac-vendor");
       const displayModeButtons = Array.from(document.querySelectorAll(".mode-segment"));
       const devicesRefreshButton = document.getElementById("devices-refresh");
       const devicesClearSortButton = document.getElementById("devices-clear-sort");
@@ -823,6 +825,7 @@
       let statusFilter = null;
       let assignmentFilter = null;
       let displayMode = "end_devices";
+      let showMacVendor = true;
 
       const fmtClock = (value) => {
         const raw = String(value || "").trim();
@@ -1198,7 +1201,7 @@
           ? `<span class="stale-value" title="Last seen hostname before DHCP lease expired">${escapeHtml(hostnameText)}</span>`
           : escapeHtml(hostnameText);
         const vendorText = String(item.mac_vendor || "").trim();
-        const showVendor = Boolean(vendorText) && !Boolean(item.is_random_mac);
+        const showVendor = showMacVendor && Boolean(vendorText) && !Boolean(item.is_random_mac);
         if (!showVendor) {
           return hostnameMarkup;
         }
@@ -1680,6 +1683,11 @@
         autoRefreshState.textContent = autoRefreshToggle.checked ? "ON" : "OFF";
       };
 
+      const syncMacVendorToggle = () => {
+        macVendorToggleButton.classList.toggle("active", showMacVendor);
+        macVendorToggleButton.setAttribute("aria-pressed", showMacVendor ? "true" : "false");
+      };
+
       devicesRefreshButton.addEventListener("click", loadDevices);
       devicesClearSortButton.addEventListener("click", () => {
         activeDeviceSort = null;
@@ -1716,6 +1724,11 @@
         target.click();
       });
       autoRefreshToggle.addEventListener("change", reconfigureAutoRefresh);
+      macVendorToggleButton.addEventListener("click", () => {
+        showMacVendor = !showMacVendor;
+        syncMacVendorToggle();
+        renderDevicesView();
+      });
       displayModeButtons.forEach((button) => {
         button.addEventListener("click", () => {
           displayMode = button.dataset.mode === "all" ? "all" : "end_devices";
@@ -1785,6 +1798,7 @@
       setCounts();
       updateDeviceSortIndicators();
       updateDisplayModeUI();
+      syncMacVendorToggle();
       reconfigureAutoRefresh();
       loadDevices();
       updateLiveTimers();

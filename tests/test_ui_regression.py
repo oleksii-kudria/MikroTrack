@@ -295,3 +295,8 @@ def test_hostname_cell_view_supports_dash_hostname_with_vendor():
 def test_hostname_cell_view_hides_vendor_for_random_mac():
     item = _device("AA:63", hostname="phone", mac_vendor="Test Vendor", is_random_mac=True)
     assert hostname_vendor_view(item) == {"hostname": "phone", "vendor": None}
+
+
+def test_hostname_cell_view_hides_vendor_when_mac_toggle_is_off():
+    item = _device("AA:64", hostname="laptop", mac_vendor="Dell Inc.", is_random_mac=False)
+    assert hostname_vendor_view(item, show_mac_vendor=False) == {"hostname": "laptop", "vendor": None}

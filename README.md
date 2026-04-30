@@ -120,7 +120,7 @@ Behavior:
 - `offline → online|idle`: стартує нова online-сесія (`online_since = now`, `offline_since = null`)
 - `unknown`: time fields можуть бути `null`
 - за відсутності explicit sorting UI використовує default state order: `online → idle → offline → unknown`
-- у таблиці Devices `mac_vendor` показується другим рядком під `Hostname` (muted/smaller), але приховується для `is_random_mac=true`
+- у таблиці Devices кнопка `MAC` керує показом `mac_vendor` другим рядком під `Hostname` (muted/smaller); для `is_random_mac=true` vendor завжди прихований
 
 ### Snapshot schema (practical)
 
@@ -419,7 +419,7 @@ Behavior:
 - `offline → online|idle`: starts a new online session (`online_since = now`, `offline_since = null`)
 - `unknown`: time fields may be `null`
 - without explicit sorting, UI default state order is `online → idle → offline → unknown`
-- in the Devices table, `mac_vendor` is rendered as a muted/smaller second line under `Hostname`, but is hidden for `is_random_mac=true`
+- in the Devices table, the `MAC` toggle controls whether `mac_vendor` is rendered as a muted/smaller second line under `Hostname`; for `is_random_mac=true` vendor is always hidden
 
 ### Snapshot schema (practical)
 
